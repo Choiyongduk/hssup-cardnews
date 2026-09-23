@@ -67,13 +67,20 @@ def main() -> int:
     except ValueError as e:
         print(f"  ! 이미지 업로드 건너뜀: {e}")
 
-    try:
-        from engine.telegram import send_preview
+    tg_cfg = cfg.get("telegram")
+    if tg_cfg:
+        import os
 
-        send_preview(cfg, pngs, caption, cfg["slug"], key)
-        print("  텔레그램 미리보기 전송 완료")
-    except ValueError as e:
-        print(f"  ! 텔레그램 미리보기 건너뜀: {e}")
+        token = os.environ.get(tg_cfg["bot_token_env"])
+        if token:
+            from engine.telegram import send_preview
+
+            send_preview(token, str(tg_cfg["chat_id"]), pngs, caption, cfg["slug"], key)
+            print("  텔레그램 미리보기 전송 완료")
+        else:
+            print(f"  ! 텔레그램 미리보기 건너뜀: {tg_cfg['bot_token_env']} 환경변수 없음")
+    else:
+        print("  ! 텔레그램 미리보기 건너뜀: channels/<slug>.yaml에 telegram 설정이 없습니다.")
 
     print("완료")
     return 0

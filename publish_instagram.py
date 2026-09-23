@@ -13,11 +13,17 @@ from engine import instagram
 from engine.config import ROOT, load_channel
 
 
-def _notify(text: str) -> None:
+def _notify(cfg: dict, text: str) -> None:
+    tg_cfg = cfg.get("telegram")
+    if not tg_cfg:
+        return
+    token = os.environ.get(tg_cfg["bot_token_env"])
+    if not token:
+        return
     try:
         from engine.telegram import notify
 
-        notify(text)
+        notify(token, str(tg_cfg["chat_id"]), text)
     except Exception as e:
         print(f"  ! 텔레그램 알림 실패: {e}")
 
@@ -47,18 +53,18 @@ def _publish_one(slug: str, date: str, entry_path, data: dict) -> None:
     caption = data.get("caption")
     if not image_urls or not caption:
         _write_status(entry_path, "failed", error="pending 레코드에 image_urls/caption이 없습니다.")
-        _notify(f"❌ [{cfg['name']}] {date} 게시 실패: 이미지/캡션 정보가 없습니다.")
+        _notify(cfg, f"❌ [{cfg['name']}] {date} 게시 실패: 이미지/캡션 정보가 없습니다.")
         return
 
     try:
         media_id = instagram.publish_carousel(business_id, token, image_urls, caption)
     except Exception as e:
         _write_status(entry_path, "failed", error=str(e))
-        _notify(f"❌ [{cfg['name']}] {date} 게시 실패: {e}")
+        _notify(cfg, f"❌ [{cfg['name']}] {date} 게시 실패: {e}")
         return
 
     _write_status(entry_path, "published", media_id=media_id)
-    _notify(f"✅ [{cfg['name']}] {date} 인스타그램 게시 완료 (media_id: {media_id})")
+    _notify(cfg, f"✅ [{cfg['name']}] {date} 인스타그램 게시 완료 (media_id: {media_id})")
 
 
 def main() -> int:

@@ -1,11 +1,17 @@
-"""텔레그램 승인 봇. render.py가 미리보기를 보내고(send_preview),
-poll_telegram.py가 주기적으로 버튼 응답을 확인해 pending/<slug>/<date>.json에 기록합니다.
+"""텔레그램 승인 봇 + 미디어 인박스.
+
+두 가지 흐름을 지원합니다:
+1. (카드뉴스형) send_preview()로 렌더링된 카드 미리보기를 보내고, poll()이 승인/건너뛰기 버튼 응답을 처리
+2. (미디어 인박스형) 사용자가 사진/영상 + 설명을 보내면 poll()이 감지해서 다운로드
+   → poll_telegram.py가 Claude로 캡션을 작성하고 다시 미리보기를 보냅니다.
+
+채널마다 다른 봇(토큰)을 쓸 수 있도록 모든 함수가 token/chat_id를 인자로 받습니다.
+봇별 폴링 오프셋은 state/telegram_offset_<bot_name>.json에 따로 저장됩니다.
 """
 from __future__ import annotations
 
 import datetime as dt
 import json
-import os
 from pathlib import Path
 
 import requests
@@ -13,25 +19,10 @@ import requests
 from .config import ROOT
 
 API = "https://api.telegram.org/bot{token}/{method}"
-OFFSET_PATH = ROOT / "state" / "telegram_offset.json"
 
 
-def _token() -> str:
-    token = os.environ.get("TELEGRAM_BOT_TOKEN")
-    if not token:
-        raise ValueError("TELEGRAM_BOT_TOKEN이 설정되어 있지 않습니다.")
-    return token
-
-
-def _chat_id() -> str:
-    chat_id = os.environ.get("TELEGRAM_CHAT_ID")
-    if not chat_id:
-        raise ValueError("TELEGRAM_CHAT_ID가 설정되어 있지 않습니다.")
-    return chat_id
-
-
-def _call(method: str, files: dict | None = None, **params) -> dict:
-    url = API.format(token=_token(), method=method)
+def _call(token: str, method: str, files: dict | None = None, **params) -> dict:
+    url = API.format(token=token, method=method)
     resp = requests.post(url, data=params, files=files, timeout=30)
     resp.raise_for_status()
     body = resp.json()
@@ -40,45 +31,39 @@ def _call(method: str, files: dict | None = None, **params) -> dict:
     return body["result"]
 
 
-def notify(text: str) -> None:
+def notify(token: str, chat_id: str, text: str) -> None:
     """단순 텍스트 알림을 보냅니다 (게시 성공/실패 등)."""
-    _call("sendMessage", chat_id=_chat_id(), text=text)
+    _call(token, "sendMessage", chat_id=chat_id, text=text)
 
 
-def create_pending(slug: str, date: str, image_urls: list[str], caption: str) -> None:
-    """렌더링 직후 승인 대기 레코드를 만듭니다. publish_instagram.py가 나중에 이 파일을 읽어 게시합니다."""
+def create_pending(slug: str, date: str, image_urls: list[str], caption: str, **extra) -> None:
+    """승인 대기 레코드를 만듭니다. publish_instagram.py가 나중에 이 파일을 읽어 게시합니다."""
     out_path = ROOT / "pending" / slug / f"{date}.json"
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    out_path.write_text(
-        json.dumps(
-            {
-                "status": "awaiting_approval",
-                "image_urls": image_urls,
-                "caption": caption,
-                "rendered_at": dt.datetime.now(dt.timezone.utc).isoformat(),
-            },
-            ensure_ascii=False,
-            indent=2,
-        ),
-        encoding="utf-8",
-    )
+    data = {
+        "status": "awaiting_approval",
+        "image_urls": image_urls,
+        "caption": caption,
+        "rendered_at": dt.datetime.now(dt.timezone.utc).isoformat(),
+    }
+    data.update(extra)
+    out_path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
-def send_preview(cfg: dict, pngs: list[Path], caption: str, slug: str, date: str) -> None:
-    """카드뉴스 PNG를 앨범으로 보내고, 승인 버튼이 달린 안내 메시지를 보냅니다."""
-    chat_id = _chat_id()
-
+def send_preview(token: str, chat_id: str, image_paths: list[Path], caption: str, slug: str, date: str) -> None:
+    """이미지를 앨범으로 보내고, 승인 버튼이 달린 안내 메시지를 보냅니다."""
     media = []
     files = {}
     handles = []
-    for i, p in enumerate(pngs[:10]):  # 텔레그램 앨범은 최대 10장
+    for i, p in enumerate(image_paths[:10]):  # 텔레그램 앨범은 최대 10장
         key = f"photo{i}"
         media.append({"type": "photo", "media": f"attach://{key}"})
         fh = p.open("rb")
         handles.append(fh)
-        files[key] = (p.name, fh, "image/png")
+        mime = "image/jpeg" if p.suffix.lower() in (".jpg", ".jpeg") else "image/png"
+        files[key] = (p.name, fh, mime)
     try:
-        _call("sendMediaGroup", chat_id=chat_id, media=json.dumps(media), files=files)
+        _call(token, "sendMediaGroup", chat_id=chat_id, media=json.dumps(media), files=files)
     finally:
         for fh in handles:
             fh.close()
@@ -91,54 +76,94 @@ def send_preview(cfg: dict, pngs: list[Path], caption: str, slug: str, date: str
     }
     text = caption if len(caption) <= 3900 else caption[:3900] + "\n…"
     text += "\n게시할까요?"
-    _call("sendMessage", chat_id=chat_id, text=text, reply_markup=json.dumps(keyboard))
+    _call(token, "sendMessage", chat_id=chat_id, text=text, reply_markup=json.dumps(keyboard))
 
 
-def poll_and_record() -> list[dict]:
-    """새 버튼 응답을 확인해 pending/<slug>/<date>.json에 기록하고, 처리한 결정 목록을 반환합니다."""
+def _offset_path(bot_name: str) -> Path:
+    return ROOT / "state" / f"telegram_offset_{bot_name}.json"
+
+
+def _download_file(token: str, file_id: str, dest_dir: Path) -> Path:
+    info = _call(token, "getFile", file_id=file_id)
+    file_path = info["file_path"]
+    url = f"https://api.telegram.org/file/bot{token}/{file_path}"
+    resp = requests.get(url, timeout=60)
+    resp.raise_for_status()
+    dest = dest_dir / Path(file_path).name
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.write_bytes(resp.content)
+    return dest
+
+
+def poll(token: str, bot_name: str, inbox_chat_id: str | None = None) -> dict:
+    """새 업데이트를 확인합니다.
+    - callback_query(승인 버튼) → pending/<slug>/<date>.json 상태 갱신
+    - inbox_chat_id가 주어지면, 그 chat에서 온 사진/영상 메시지를 다운로드해서 inbox 목록으로 반환
+      (V1 제한: 메시지당 사진/영상 1개만 처리 — 여러 장을 한 앨범으로 보내면 첫 장만 반영됩니다.)
+
+    반환: {"decided": [{"slug","date","status"}, ...], "inbox": [{"paths": [Path], "caption": str, "message_id": int}, ...]}
+    """
+    offset_path = _offset_path(bot_name)
     offset = 0
-    if OFFSET_PATH.exists():
-        offset = json.loads(OFFSET_PATH.read_text(encoding="utf-8")).get("offset", 0)
+    if offset_path.exists():
+        offset = json.loads(offset_path.read_text(encoding="utf-8")).get("offset", 0)
 
-    updates = _call("getUpdates", offset=offset, timeout=0)
-    decided = []
+    updates = _call(token, "getUpdates", offset=offset, timeout=0)
+    decided: list[dict] = []
+    inbox: list[dict] = []
     max_update_id = offset - 1
 
     for u in updates:
         max_update_id = max(max_update_id, u["update_id"])
+
         cq = u.get("callback_query")
-        if not cq or "data" not in cq:
+        if cq and "data" in cq:
+            try:
+                action, slug, date = cq["data"].split(":", 2)
+            except ValueError:
+                continue
+            status = "approved" if action == "approve" else "skipped"
+
+            out_path = ROOT / "pending" / slug / f"{date}.json"
+            out_path.parent.mkdir(parents=True, exist_ok=True)
+            existing = json.loads(out_path.read_text(encoding="utf-8")) if out_path.exists() else {}
+            existing["status"] = status
+            existing["decided_at"] = dt.datetime.now(dt.timezone.utc).isoformat()
+            out_path.write_text(json.dumps(existing, ensure_ascii=False, indent=2), encoding="utf-8")
+            decided.append({"slug": slug, "date": date, "status": status})
+
+            # 콜백 응답에는 유효시간이 있어 폴링 주기보다 먼저 만료될 수 있습니다.
+            # 화면 갱신이 실패해도 위의 pending/ 기록은 이미 끝났으니 무시하고 계속 진행합니다.
+            label = "✅ 게시 확정" if status == "approved" else "⏭ 건너뜀"
+            try:
+                _call(token, "answerCallbackQuery", callback_query_id=cq["id"], text=label)
+                msg = cq["message"]
+                _call(
+                    token,
+                    "editMessageReplyMarkup",
+                    chat_id=msg["chat"]["id"],
+                    message_id=msg["message_id"],
+                    reply_markup=json.dumps({"inline_keyboard": [[{"text": label, "callback_data": "noop"}]]}),
+                )
+            except Exception as e:
+                print(f"  ! 텔레그램 UI 갱신 실패(응답 만료 가능성, 기록은 정상 반영됨): {e}")
             continue
-        try:
-            action, slug, date = cq["data"].split(":", 2)
-        except ValueError:
-            continue
-        status = "approved" if action == "approve" else "skipped"
 
-        # render.py가 렌더링 직후 만들어둔 레코드(이미지 URL·캡션 포함)를 그대로 두고 상태만 갱신합니다.
-        out_path = ROOT / "pending" / slug / f"{date}.json"
-        out_path.parent.mkdir(parents=True, exist_ok=True)
-        existing = json.loads(out_path.read_text(encoding="utf-8")) if out_path.exists() else {}
-        existing["status"] = status
-        existing["decided_at"] = dt.datetime.now(dt.timezone.utc).isoformat()
-        out_path.write_text(json.dumps(existing, ensure_ascii=False, indent=2), encoding="utf-8")
-        decided.append({"slug": slug, "date": date, "status": status})
+        msg = u.get("message")
+        if msg and inbox_chat_id and str(msg.get("chat", {}).get("id")) == str(inbox_chat_id):
+            photos = msg.get("photo")
+            video = msg.get("video")
+            if not photos and not video:
+                continue
+            dest_dir = ROOT / "state" / "inbox" / bot_name / str(u["update_id"])
+            paths = []
+            if photos:
+                largest = photos[-1]  # 텔레그램은 작은 해상도부터 순서대로 줍니다
+                paths.append(_download_file(token, largest["file_id"], dest_dir))
+            if video:
+                paths.append(_download_file(token, video["file_id"], dest_dir))
+            inbox.append({"paths": paths, "caption": msg.get("caption", ""), "message_id": msg["message_id"]})
 
-        # 콜백 응답에는 유효시간이 있어 폴링 주기(5분)보다 먼저 만료될 수 있습니다.
-        # 화면 갱신(체크 표시)이 실패해도 위의 pending/ 기록은 이미 끝났으니 무시하고 계속 진행합니다.
-        label = "✅ 게시 확정" if status == "approved" else "⏭ 건너뜀"
-        try:
-            _call("answerCallbackQuery", callback_query_id=cq["id"], text=label)
-            msg = cq["message"]
-            _call(
-                "editMessageReplyMarkup",
-                chat_id=msg["chat"]["id"],
-                message_id=msg["message_id"],
-                reply_markup=json.dumps({"inline_keyboard": [[{"text": label, "callback_data": "noop"}]]}),
-            )
-        except Exception as e:
-            print(f"  ! 텔레그램 UI 갱신 실패(응답 만료 가능성, 기록은 정상 반영됨): {e}")
-
-    OFFSET_PATH.parent.mkdir(parents=True, exist_ok=True)
-    OFFSET_PATH.write_text(json.dumps({"offset": max_update_id + 1}), encoding="utf-8")
-    return decided
+    offset_path.parent.mkdir(parents=True, exist_ok=True)
+    offset_path.write_text(json.dumps({"offset": max_update_id + 1}), encoding="utf-8")
+    return {"decided": decided, "inbox": inbox}
