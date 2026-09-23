@@ -1,0 +1,29 @@
+name: Refresh Instagram Tokens
+
+on:
+  schedule:
+    - cron: "0 3 * * 1"  # 매주 월요일 (만료 전 미리 갱신)
+  workflow_dispatch:
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install minimal dependencies
+        run: pip install PyYAML python-dotenv requests
+
+      - name: Log in gh CLI (needed to update secrets)
+        run: echo "${{ secrets.ASSETS_REPO_TOKEN }}" | gh auth login --with-token
+
+      - name: Refresh long-lived tokens
+        env:
+          FB_APP_ID: ${{ secrets.FB_APP_ID }}
+          FB_APP_SECRET: ${{ secrets.FB_APP_SECRET }}
+          HSSUP_IG_TOKEN: ${{ secrets.HSSUP_IG_TOKEN }}
+        run: python refresh_ig_tokens.py

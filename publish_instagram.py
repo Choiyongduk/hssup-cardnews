@@ -1,11 +1,12 @@
 """사용법: python publish_instagram.py
 pending/<slug>/<date>.json 중 status가 "approved"인 항목을 찾아
-(image_urls·caption은 render.py가 렌더링 시점에 이미 채워둔 값) Buffer API로 Instagram에 캐러셀 게시합니다.
+(image_urls·caption은 render.py가 렌더링 시점에 이미 채워둔 값) Instagram Graph API로 캐러셀 게시합니다.
 성공/실패 모두 pending 파일에 기록하고 텔레그램으로 알립니다."""
 from __future__ import annotations
 
 import datetime as dt
 import json
+import os
 import sys
 
 from engine import instagram
@@ -32,8 +33,14 @@ def _write_status(path, status: str, **extra) -> None:
 def _publish_one(slug: str, date: str, entry_path, data: dict) -> None:
     cfg = load_channel(slug)
     ig_cfg = cfg.get("instagram")
-    if not ig_cfg or not ig_cfg.get("channel_id"):
-        print(f"  ! {slug}: channels/{slug}.yaml에 instagram.channel_id가 없어 건너뜁니다.")
+    if not ig_cfg:
+        print(f"  ! {slug}: channels/{slug}.yaml에 instagram 설정이 없어 건너뜁니다.")
+        return
+
+    business_id = os.environ.get(ig_cfg["business_id_env"])
+    token = os.environ.get(ig_cfg["token_env"])
+    if not business_id or not token:
+        print(f"  ! {slug}: {ig_cfg['business_id_env']}/{ig_cfg['token_env']} 환경변수가 없어 건너뜁니다.")
         return
 
     image_urls = data.get("image_urls")
@@ -44,14 +51,14 @@ def _publish_one(slug: str, date: str, entry_path, data: dict) -> None:
         return
 
     try:
-        post_id = instagram.publish_carousel(ig_cfg["channel_id"], image_urls, caption)
+        media_id = instagram.publish_carousel(business_id, token, image_urls, caption)
     except Exception as e:
         _write_status(entry_path, "failed", error=str(e))
         _notify(f"❌ [{cfg['name']}] {date} 게시 실패: {e}")
         return
 
-    _write_status(entry_path, "published", buffer_post_id=post_id)
-    _notify(f"✅ [{cfg['name']}] {date} 인스타그램 게시 대기열에 등록 완료 (Buffer post: {post_id})")
+    _write_status(entry_path, "published", media_id=media_id)
+    _notify(f"✅ [{cfg['name']}] {date} 인스타그램 게시 완료 (media_id: {media_id})")
 
 
 def main() -> int:
