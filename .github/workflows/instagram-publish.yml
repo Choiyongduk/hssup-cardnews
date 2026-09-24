@@ -36,6 +36,8 @@ jobs:
           HSSUP_ACADEMY_IG_TOKEN: ${{ secrets.HSSUP_ACADEMY_IG_TOKEN }}
           ARTMAKE_IG_BUSINESS_ID: ${{ secrets.ARTMAKE_IG_BUSINESS_ID }}
           ARTMAKE_IG_TOKEN: ${{ secrets.ARTMAKE_IG_TOKEN }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: python publish_instagram.py
 
       - name: Commit publish status updates
