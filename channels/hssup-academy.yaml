@@ -24,3 +24,8 @@ hashtags:
 instagram:
   business_id_env: HSSUP_IG_BUSINESS_ID
   token_env: HSSUP_IG_TOKEN
+
+# 보내주신 사진에 히썹 브랜드 로고+헤드라인을 자동으로 입혀서 게시 (engine/overlay.py)
+overlay:
+  logo: assets/logos/hssup-academy.png
+  brand_color: "#ff7a00"   # HISSUP orange (브랜드 가이드 PANTONE 293C / R255 G122 B0)

@@ -14,6 +14,9 @@ import yaml
 
 from engine import assets, media_caption, telegram
 from engine.config import ROOT
+from engine.overlay import render_overlay
+
+IMAGE_EXTS = {".jpg", ".jpeg", ".png"}
 
 
 def _handle_inbox_item(cfg: dict, token: str, chat_id: str, item: dict) -> None:
@@ -21,11 +24,28 @@ def _handle_inbox_item(cfg: dict, token: str, chat_id: str, item: dict) -> None:
     date_key = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%d-%H%M%S")
     print(f"  - [{slug}] 새 미디어 수신, 캡션 작성 중...")
 
+    photo_path = item["paths"][0]
+    overlay_cfg = cfg.get("overlay")
+    is_image = photo_path.suffix.lower() in IMAGE_EXTS
+
     try:
-        caption = media_caption.write_caption(
-            item["paths"][0], item["caption"], cfg.get("topic", cfg["name"]), cfg.get("hashtags", [])
+        post = media_caption.write_post(
+            photo_path, item["caption"], cfg.get("topic", cfg["name"]), cfg.get("hashtags", [])
         )
-        image_urls = assets.upload_images(item["paths"], slug, date_key)
+        caption = post["caption"]
+
+        post_paths = item["paths"]
+        if overlay_cfg and is_image:
+            rendered = render_overlay(
+                photo_path=photo_path,
+                headline=post["headline"],
+                out_path=photo_path.with_name(photo_path.stem + "_post.png"),
+                logo_path=(ROOT / overlay_cfg["logo"]) if overlay_cfg.get("logo") else None,
+                brand_color=overlay_cfg.get("brand_color", "#ff7a00"),
+            )
+            post_paths = [rendered]
+
+        image_urls = assets.upload_images(post_paths, slug, date_key)
     except Exception as e:
         print(f"  ! [{slug}] 처리 실패: {e}")
         try:
@@ -37,7 +57,7 @@ def _handle_inbox_item(cfg: dict, token: str, chat_id: str, item: dict) -> None:
     telegram.create_pending(
         slug, date_key, image_urls, caption, source_message_id=item["message_id"]
     )
-    telegram.send_preview(token, chat_id, item["paths"], caption, slug, date_key)
+    telegram.send_preview(token, chat_id, post_paths, caption, slug, date_key)
     print(f"  - [{slug}] {date_key} 미리보기 전송 완료")
 
 
