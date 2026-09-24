@@ -35,17 +35,18 @@ def _write_status(path, status: str, **extra) -> None:
 def _send_one(slug: str, entry_path, data: dict) -> None:
     cfg = load_channel(slug)
     ig_cfg = cfg.get("instagram")
-    if not ig_cfg:
+    dm_cfg = cfg.get("dm")
+    if not ig_cfg or not dm_cfg:
         return
 
-    business_id = os.environ.get(ig_cfg["business_id_env"])
+    page_id = os.environ.get(dm_cfg["page_id_env"])
     token = os.environ.get(ig_cfg["token_env"])
-    if not business_id or not token:
+    if not page_id or not token:
         print(f"  ! {slug}: instagram 환경변수 없음, 건너뜀")
         return
 
     try:
-        message_id = dm.send_message(business_id, token, data["recipient_id"], data["draft_reply"])
+        message_id = dm.send_message(page_id, token, data["recipient_id"], data["draft_reply"])
     except Exception as e:
         _write_status(entry_path, "failed", error=str(e))
         _notify(cfg, f"❌ [{cfg['name']}] DM 발송 실패: {e}")

@@ -35,6 +35,7 @@ overlay:
 # 처음엔 사람이 승인 후 발송, 나중에 mode를 auto로 바꾸면 AI가 바로 자동 발송하도록 확장 예정.
 dm:
   mode: manual
+  page_id_env: HSSUP_ACADEMY_PAGE_ID   # 대화 조회·발송은 IG 계정 ID가 아닌 연결된 페이지 ID로 합니다
   # TODO: 실제 수강 문의 FAQ(가격, 커리큘럼, 일정, 위치 등)로 채워주세요 — 채워질수록 답장이 정확해집니다.
   context: |
     히썹 아카데미는 반영구 화장(눈썹, 아이라인, 입술 등) 전문 교육 기관입니다.

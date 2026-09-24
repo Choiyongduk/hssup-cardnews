@@ -1,5 +1,8 @@
 """Instagram DM(다이렉트 메시지) 조회·발송. Meta Graph API 사용.
-토큰에 instagram_manage_messages 권한이 있어야 합니다."""
+
+인스타그램 계정 ID가 아니라 연결된 **페이지 ID**에 platform=instagram을 붙여 호출해야 합니다
+(계정 ID로 부르면 (#3) capability 오류가 납니다). 토큰도 페이지 액세스 토큰이어야 하고,
+인스타그램 앱에서 "메시지 액세스 허용"이 켜져 있어야 합니다."""
 from __future__ import annotations
 
 import requests
@@ -24,12 +27,13 @@ def _post(path: str, **params) -> dict:
     return body
 
 
-def list_recent_messages(business_id: str, token: str, limit: int = 20) -> list[dict]:
+def list_recent_messages(page_id: str, token: str, self_id: str = "", limit: int = 20) -> list[dict]:
     """최근 대화들에서 상대방이 보낸 메시지를 최신순으로 반환합니다.
     반환: [{"conversation_id", "message_id", "from_id", "text", "created_time"}, ...]
     (우리가 보낸 메시지는 제외합니다.)"""
     convos = _get(
-        f"{business_id}/conversations",
+        f"{page_id}/conversations",
+        platform="instagram",
         fields=f"participants,messages.limit(5){{id,message,from,created_time}}",
         limit=limit,
         access_token=token,
@@ -39,7 +43,7 @@ def list_recent_messages(business_id: str, token: str, limit: int = 20) -> list[
         messages = (convo.get("messages") or {}).get("data", [])
         for m in messages:
             from_id = (m.get("from") or {}).get("id")
-            if from_id == business_id:
+            if from_id in (page_id, self_id):
                 continue  # 우리가 보낸 메시지는 건너뜀
             if not m.get("message"):
                 continue  # 텍스트 없는 메시지(스티커 등)는 V1에서 건너뜀
@@ -55,12 +59,12 @@ def list_recent_messages(business_id: str, token: str, limit: int = 20) -> list[
     return out
 
 
-def send_message(business_id: str, token: str, recipient_id: str, text: str) -> str:
+def send_message(page_id: str, token: str, recipient_id: str, text: str) -> str:
     """recipient_id에게 텍스트 DM을 보내고 메시지 ID를 반환합니다."""
     import json
 
     result = _post(
-        f"{business_id}/messages",
+        f"{page_id}/messages",
         recipient=json.dumps({"id": recipient_id}),
         message=json.dumps({"text": text}),
         access_token=token,

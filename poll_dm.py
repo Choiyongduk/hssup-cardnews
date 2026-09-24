@@ -43,16 +43,17 @@ def _process_channel(path) -> None:
 
     slug = cfg["slug"]
     business_id = os.environ.get(ig_cfg["business_id_env"])
+    page_id = os.environ.get(dm_cfg["page_id_env"])
     ig_token = os.environ.get(ig_cfg["token_env"])
     tg_token = os.environ.get(tg_cfg["bot_token_env"])
-    if not business_id or not ig_token or not tg_token:
+    if not page_id or not ig_token or not tg_token:
         print(f"  ! [{slug}] DM 관련 환경변수 없음, 건너뜀")
         return
     chat_id = str(tg_cfg["chat_id"])
 
     seen = _load_seen(slug)
     try:
-        messages = dm.list_recent_messages(business_id, ig_token)
+        messages = dm.list_recent_messages(page_id, ig_token, self_id=business_id or "")
     except Exception as e:
         print(f"  ! [{slug}] DM 조회 실패: {e}")
         return

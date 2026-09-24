@@ -33,6 +33,7 @@ overlay:
 # DM 자동 응대 (poll_dm.py) — 받은 DM에 Claude가 답장 초안을 쓰고, 텔레그램으로 승인 요청을 보냅니다.
 dm:
   mode: manual
+  page_id_env: ARTMAKE_PAGE_ID   # 대화 조회·발송은 IG 계정 ID가 아닌 연결된 페이지 ID로 합니다
   # TODO: 실제 시술 문의 FAQ(가격, 예약 방법, 위치, 시술 후 관리 등)로 채워주세요.
   context: |
     히썹 아트메이크는 눈썹, 아이라인, 입술 등 반영구 화장 시술 전문 계정입니다.
