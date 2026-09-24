@@ -37,11 +37,13 @@ def render_overlay(
     headline: str,
     out_path: Path,
     logo_path: Path | None = None,
+    logo_text: str | None = None,
     brand_color: str = "#ff7a00",
     width: int = 1080,
     height: int = 1350,
 ) -> Path:
-    """사진 1장 + 헤드라인 + (선택) 로고를 합성해 out_path에 PNG로 저장합니다."""
+    """사진 1장 + 헤드라인 + (선택) 로고를 합성해 out_path에 PNG로 저장합니다.
+    logo_path가 있으면 이미지 로고, 없고 logo_text만 있으면 텍스트 로고를 씁니다."""
     env = Environment(
         loader=FileSystemLoader(str(TEMPLATE_DIR)),
         autoescape=select_autoescape(["html"]),
@@ -49,6 +51,7 @@ def render_overlay(
     html = env.get_template("post.html").render(
         photo_uri=photo_path.resolve().as_uri(),
         logo_uri=logo_path.resolve().as_uri() if logo_path else None,
+        logo_text=logo_text if not logo_path else None,
         headline=headline,
         brand_color=brand_color,
         css_url=(TEMPLATE_DIR / "style.css").as_uri(),

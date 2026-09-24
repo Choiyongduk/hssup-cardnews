@@ -1,31 +1,32 @@
-# 히썹 아카데미 전용 계정 채널 (@hssup_academy, 메인 계정 @h_ssup_과는 다른 별도 계정).
+# 히썹 시술계정 (@h_ssup_artmake). 시술 전후 사진/영상 + 시술 기법 콘텐츠 전용.
 # 사모님이 텔레그램 봇으로 사진/영상 + 설명을 보내면, Claude가 캡션을 써서 승인 요청을 보내고,
 # 승인하면 Instagram에 게시합니다. (RSS/렌더링형이 아니라 미디어 인박스형 채널입니다.)
-slug: hssup-academy
-name: 히썹 아카데미
-handle: "@hssup_academy"
-topic: 히썹 반영구 아카데미 수강·교육 콘텐츠 (강의, 실습, 수료, 반영구 업계 최신 정보)   # 캡션 작성 시 사용되는 채널 주제
+slug: hssup-artmake
+name: 히썹 아트메이크(시술계정)
+handle: "@h_ssup_artmake"
+topic: 히썹 반영구 시술 결과 및 기법 소개 (시술 전후, 디자인 포인트)   # 캡션 작성 시 사용되는 채널 주제
 
 source:
   type: telegram_inbox           # poll_telegram.py가 처리 (render.py는 이 채널에 사용 안 함)
 
 telegram:
-  bot_token_env: HSSUP_ACADEMY_BOT_TOKEN
-  chat_id: "8582929102"
+  bot_token_env: ARTMAKE_BOT_TOKEN
+  chat_id: ""                    # TODO: 봇에 메시지 보낸 후 chat_id로 채우기
 
 hashtags:
   - 히썹
   - 반영구
   - 눈썹문신
-  - PMU교육
-  - 반영구아카데미
+  - 아트메이크
+  - 반영구시술
 
 # Meta Graph API (앱은 다른 두 채널과 공용, 계정만 다름)
 instagram:
-  business_id_env: HSSUP_ACADEMY_IG_BUSINESS_ID
-  token_env: HSSUP_ACADEMY_IG_TOKEN
+  business_id_env: ARTMAKE_IG_BUSINESS_ID
+  token_env: ARTMAKE_IG_TOKEN
 
 # 보내주신 사진에 히썹 브랜드 로고+헤드라인을 자동으로 입혀서 게시 (engine/overlay.py)
+# 깨끗한 로고 파일이 없어서 텍스트 로고로 대체 (나중에 전용 로고 파일 생기면 logo: 로 교체)
 overlay:
-  logo: assets/logos/hssup-academy.png
+  logo_text: "HISSUP"
   brand_color: "#ff7a00"   # HISSUP orange (브랜드 가이드 PANTONE 293C / R255 G122 B0)

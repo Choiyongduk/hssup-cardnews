@@ -41,6 +41,7 @@ def _handle_inbox_item(cfg: dict, token: str, chat_id: str, item: dict) -> None:
                 headline=post["headline"],
                 out_path=photo_path.with_name(photo_path.stem + "_post.png"),
                 logo_path=(ROOT / overlay_cfg["logo"]) if overlay_cfg.get("logo") else None,
+                logo_text=overlay_cfg.get("logo_text"),
                 brand_color=overlay_cfg.get("brand_color", "#ff7a00"),
             )
             post_paths = [rendered]

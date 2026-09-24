@@ -46,6 +46,14 @@ html, body {
   display: block;
 }
 
+.logo-badge--text {
+  font-weight: 800;
+  font-size: 30px;
+  letter-spacing: 0.02em;
+  color: #111;
+  white-space: nowrap;
+}
+
 .caption-block {
   position: absolute;
   left: 64px;

@@ -30,6 +30,8 @@
     <div class="logo-badge">
       <img src="{{ logo_uri }}" />
     </div>
+    {% elif logo_text %}
+    <div class="logo-badge logo-badge--text">{{ logo_text }}</div>
     {% endif %}
 
     <div class="caption-block fit-box" data-name="headline">
