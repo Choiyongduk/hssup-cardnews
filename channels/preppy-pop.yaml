@@ -3,7 +3,7 @@
 # 승인하면 Instagram에 게시합니다. (RSS/렌더링형이 아니라 미디어 인박스형 채널입니다.)
 slug: preppy-pop
 name: 프레피팝
-handle: "@preppy_pop"            # 실제 계정 생성 후 교체
+handle: "@preppypop_official"
 topic: 프레피팝 반영구 색소 브랜드   # 캡션 작성 시 사용되는 채널 주제
 
 source:
@@ -11,7 +11,7 @@ source:
 
 telegram:
   bot_token_env: PREPPY_POP_BOT_TOKEN
-  chat_id: ""                    # TODO: 봇 생성 후 사장님 chat_id로 채우기
+  chat_id: "8582929102"
 
 hashtags:
   - 프레피팝
