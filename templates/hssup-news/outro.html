@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block kind %}outro{% endblock %}
+{% block content %}
+<section class="fit-box" data-name="outro">
+  <p class="label">오늘의 한 줄</p>
+  <h1 class="one-liner" data-fit="44">{{ data.one_liner }}</h1>
+  <div class="cta">
+    <h2>{{ cfg.outro.cta_title }}</h2>
+    <p data-fit="24">{{ cfg.outro.cta_body }}</p>
+    <p class="handle">{{ cfg.handle }} 팔로우</p>
+  </div>
+</section>
+{% endblock %}

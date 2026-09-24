@@ -56,6 +56,7 @@ class Renderer:
             "total": total,
             "css_url": (self.tpl_dir / "style.css").as_uri(),
             "font_dir": (ROOT / "assets" / "fonts").as_uri(),
+            "assets_dir": (ROOT / "assets").as_uri(),
             "theme": pick_palette(dt.date.fromisoformat(data["date"]), fixed=self.cfg.get("palette")),
         }
         pages = [("01_cover", self.env.get_template("cover.html").render(page=1, **common))]

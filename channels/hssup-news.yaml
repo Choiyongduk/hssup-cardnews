@@ -3,9 +3,8 @@
 slug: hssup-news
 name: 히썹 반영구 뉴스
 handle: "@hssup_academy"
-template: ai-news                # templates/<template>/ 폴더 사용 (cardnews에서 이식)
+template: hssup-news              # templates/<template>/ 폴더 사용 (HISSUP 브랜드 오렌지/블랙 고정 팔레트)
 cards: 4
-palette: yellow
 topic: 반영구화장·문신 관련 정책·규제·법률 뉴스 (문신사법, 식약처 고시, 색소 안전기준, 업계 동향 등. 특정 업체 홍보성 소식 제외) # 요약 프롬프트에 쓰이는 채널 주제
 size:
   width: 1080

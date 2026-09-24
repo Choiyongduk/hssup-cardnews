@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block kind %}news{% endblock %}
+{% block content %}
+<section class="fit-box accent-{{ ((index - 1) % 3) + 1 }}" data-name="news-{{ index }}">
+  <span class="tag">뉴스 {{ index }}</span>
+  <h1 class="title" data-fit="48">{{ item.title }}</h1>
+  <ul class="summary">
+    {% for line in item.summary %}<li data-fit="30">{{ line }}</li>{% endfor %}
+  </ul>
+  <div class="why">
+    <p class="label"><span class="check">✓</span>KEY POINT</p>
+    <p data-fit="26">{{ item.why }}</p>
+  </div>
+  <p class="source">출처: {{ item.source.name }}<br><span class="source-url" data-fit="16">{{ item.source.url }}</span></p>
+</section>
+{% endblock %}

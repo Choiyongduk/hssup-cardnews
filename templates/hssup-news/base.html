@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="{{ css_url }}">
+</head>
+<body>
+<main class="card {% block kind %}{% endblock %}">
+  <header class="topbar">
+    <img class="logo" src="{{ assets_dir }}/logos/hssup-general.png">
+    <span>{{ data.date_label }}</span>
+  </header>
+  {% block content %}{% endblock %}
+  <footer class="footer">
+    <span>{{ cfg.handle }}</span>
+    <span class="page"><b>{{ page }}</b> / {{ total }}</span>
+  </footer>
+</main>
+</body>
+</html>
