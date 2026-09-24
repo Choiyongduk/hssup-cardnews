@@ -2,12 +2,27 @@
 from __future__ import annotations
 
 import base64
+import io
 import os
 from pathlib import Path
 
 from anthropic import Anthropic
+from PIL import Image
 
 DEFAULT_MODEL = "claude-sonnet-5"
+MAX_EDGE = 1568  # Claude 권장 최대 변 길이 (그 이상은 어차피 다운스케일됨)
+
+
+def _normalize_image(image_path: Path) -> tuple[bytes, str]:
+    """색상 프로파일(CMYK 등)·포맷 문제로 API가 거부하는 걸 막기 위해
+    표준 sRGB JPEG로 다시 인코딩합니다. (image_bytes, media_type) 반환."""
+    with Image.open(image_path) as im:
+        im = im.convert("RGB")
+        if max(im.size) > MAX_EDGE:
+            im.thumbnail((MAX_EDGE, MAX_EDGE), Image.LANCZOS)
+        buf = io.BytesIO()
+        im.save(buf, format="JPEG", quality=90)
+        return buf.getvalue(), "image/jpeg"
 
 SYSTEM_TEMPLATE = """당신은 {topic} 인스타그램 계정의 캡션·이미지 헤드라인 작가입니다. 아래 원칙을 반드시 지키세요.
 - 사진을 직접 보고, 사용자가 함께 보낸 설명을 참고해서 자연스러운 인스타그램 캡션과 이미지용 헤드라인을 작성하세요.
@@ -28,8 +43,8 @@ def write_post(
 ) -> dict:
     """이미지 1장을 보고 {"headline": ..., "caption": ...}을 작성합니다."""
     client = Anthropic()
-    media_type = "image/jpeg" if image_path.suffix.lower() in (".jpg", ".jpeg") else "image/png"
-    image_b64 = base64.standard_b64encode(image_path.read_bytes()).decode()
+    image_bytes, media_type = _normalize_image(image_path)
+    image_b64 = base64.standard_b64encode(image_bytes).decode()
 
     user_content = [
         {"type": "image", "source": {"type": "base64", "media_type": media_type, "data": image_b64}},
