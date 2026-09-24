@@ -44,7 +44,15 @@ def _wait_until_ready(container_id: str, token: str, timeout: int = 60) -> None:
 
 
 def publish_carousel(business_id: str, token: str, image_urls: list[str], caption: str) -> str:
-    """이미지 URL 목록(최대 10장)을 캐러셀로 게시하고, 게시된 미디어 ID를 반환합니다."""
+    """이미지 URL 목록을 게시하고, 게시된 미디어 ID를 반환합니다.
+    1장이면 단일 이미지 게시, 2장 이상이면 캐러셀로 게시합니다
+    (Instagram API는 캐러셀에 최소 2개의 하위 미디어를 요구합니다)."""
+    if len(image_urls) == 1:
+        container = _post(f"{business_id}/media", image_url=image_urls[0], caption=caption, access_token=token)
+        _wait_until_ready(container["id"], token)
+        published = _post(f"{business_id}/media_publish", creation_id=container["id"], access_token=token)
+        return published["id"]
+
     child_ids = []
     for url in image_urls[:10]:
         container = _post(f"{business_id}/media", image_url=url, is_carousel_item="true", access_token=token)
