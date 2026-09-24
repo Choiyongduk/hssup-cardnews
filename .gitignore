@@ -5,3 +5,5 @@ __pycache__/
 output/
 state/inbox/
 state/queue_tmp/
+# 고객이 보낸 DM 원문과 발신자 ID가 들어 있습니다. 저장소가 공개라 올리면 안 됩니다.
+pending_dm/

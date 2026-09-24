@@ -5,6 +5,7 @@ Claude로 답장 초안을 쓰고, 같은 채널의 텔레그램 봇으로 승�
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import sys
@@ -63,12 +64,15 @@ def _process_channel(path) -> None:
         if m["message_id"] in seen:
             continue
 
+        # 인스타그램 메시지 ID는 텔레그램 callback_data 한도(64바이트)를 넘으므로 짧은 키로 줄입니다.
+        key = hashlib.sha1(m["message_id"].encode()).hexdigest()[:12]
+
         try:
             draft = dm_reply.write_reply(
                 m["text"], cfg.get("topic", cfg["name"]), dm_cfg.get("context", "")
             )
-            telegram.create_pending_dm(slug, m["message_id"], m["from_id"], m["text"], draft)
-            telegram.send_dm_preview(tg_token, chat_id, slug, m["message_id"], m["text"], draft)
+            telegram.create_pending_dm(slug, key, m["from_id"], m["text"], draft)
+            telegram.send_dm_preview(tg_token, chat_id, slug, key, m["text"], draft)
             print(f"  - [{slug}] 새 DM 답장 초안 전송: {m['message_id']}")
             seen.add(m["message_id"])  # 성공했을 때만 처리됨으로 기록 (실패하면 다음 폴링에서 재시도)
             new_count += 1
