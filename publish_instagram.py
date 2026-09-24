@@ -57,7 +57,11 @@ def _publish_one(slug: str, date: str, entry_path, data: dict) -> None:
         return
 
     try:
-        media_id = instagram.publish_carousel(business_id, token, image_urls, caption)
+        is_video = image_urls[0].lower().endswith((".mp4", ".mov"))
+        if is_video:
+            media_id = instagram.publish_video(business_id, token, image_urls[0], caption)
+        else:
+            media_id = instagram.publish_carousel(business_id, token, image_urls, caption)
     except Exception as e:
         _write_status(entry_path, "failed", error=str(e))
         _notify(cfg, f"❌ [{cfg['name']}] {date} 게시 실패: {e}")

@@ -1,7 +1,7 @@
 """사용법: python poll_telegram.py
 channels/*.yaml에 정의된 채널마다 각자의 텔레그램 봇을 폴링합니다.
 - 모든 채널: 승인/건너뛰기 버튼 응답을 pending/<slug>/<date>.json에 반영
-- source.type이 telegram_inbox인 채널: 새로 들어온 사진 + 설명을 감지해서
+- source.type이 telegram_inbox인 채널: 새로 들어온 사진/영상 + 설명을 감지해서
   queue/<slug>/에 대기열로 등록합니다 (캡션 작성·게시는 process_queue.py가 매일 하나씩 처리).
 """
 from __future__ import annotations
@@ -17,23 +17,22 @@ from engine import assets, telegram
 from engine.config import ROOT
 
 IMAGE_EXTS = {".jpg", ".jpeg", ".png"}
+VIDEO_EXTS = {".mp4", ".mov"}
 
 
 def _enqueue_inbox_item(cfg: dict, token: str, chat_id: str, item: dict) -> None:
     slug = cfg["slug"]
-    photo_path = item["paths"][0]
-    is_image = photo_path.suffix.lower() in IMAGE_EXTS
+    media_path = item["paths"][0]
+    ext = media_path.suffix.lower()
 
-    if not is_image:
-        print(f"  ! [{slug}] 영상은 아직 지원하지 않아 건너뜁니다: {photo_path.name}")
-        telegram.notify(
-            token, chat_id, f"⚠️ [{cfg['name']}] 영상은 아직 자동 처리가 안 돼요 — 사진으로 보내주세요."
-        )
+    if ext not in IMAGE_EXTS and ext not in VIDEO_EXTS:
+        print(f"  ! [{slug}] 지원하지 않는 파일 형식이라 건너뜁니다: {media_path.name}")
+        telegram.notify(token, chat_id, f"⚠️ [{cfg['name']}] 지원하지 않는 파일 형식이에요 — 사진/영상으로 보내주세요.")
         return
 
     ts = dt.datetime.now(dt.timezone.utc).strftime("%Y%m%d-%H%M%S")
     try:
-        image_urls = assets.upload_images([photo_path], slug, f"queue/{ts}")
+        media_urls = assets.upload_images([media_path], slug, f"queue/{ts}")
     except Exception as e:
         print(f"  ! [{slug}] 대기열 등록 실패: {e}")
         try:
@@ -48,7 +47,8 @@ def _enqueue_inbox_item(cfg: dict, token: str, chat_id: str, item: dict) -> None
     entry_path.write_text(
         json.dumps(
             {
-                "image_url": image_urls[0],
+                "media_url": media_urls[0],
+                "media_type": "video" if ext in VIDEO_EXTS else "image",
                 "user_caption": item["caption"],
                 "message_id": item["message_id"],
                 "queued_at": dt.datetime.now(dt.timezone.utc).isoformat(),

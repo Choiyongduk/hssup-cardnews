@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<link rel="stylesheet" href="{{ css_url }}" />
+<style>
+  @font-face {
+    font-family: "Pretendard";
+    src: url("{{ font_dir }}/Pretendard-ExtraBold.woff2") format("woff2");
+    font-weight: 800;
+  }
+  @font-face {
+    font-family: "Pretendard";
+    src: url("{{ font_dir }}/Pretendard-Bold.woff2") format("woff2");
+    font-weight: 700;
+  }
+  html, body, .frame { background: transparent !important; }
+  html, body { width: {{ width }}px; height: {{ height }}px; }
+</style>
+</head>
+<body style="--brand-color: {{ brand_color }};">
+  <div class="frame">
+    <div class="gradient"></div>
+
+    {% if logo_uri %}
+    <div class="logo-badge">
+      <img src="{{ logo_uri }}" />
+    </div>
+    {% elif logo_text %}
+    <div class="logo-badge logo-badge--text">{{ logo_text }}</div>
+    {% endif %}
+
+    <div class="caption-block fit-box" data-name="headline">
+      <div class="accent-bar"></div>
+      <div class="headline" data-fit="40">{{ headline }}</div>
+    </div>
+  </div>
+</body>
+</html>

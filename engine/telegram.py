@@ -57,10 +57,14 @@ def send_preview(token: str, chat_id: str, image_paths: list[Path], caption: str
     handles = []
     for i, p in enumerate(image_paths[:10]):  # 텔레그램 앨범은 최대 10장
         key = f"photo{i}"
-        media.append({"type": "photo", "media": f"attach://{key}"})
+        is_video = p.suffix.lower() in (".mp4", ".mov")
+        media.append({"type": "video" if is_video else "photo", "media": f"attach://{key}"})
         fh = p.open("rb")
         handles.append(fh)
-        mime = "image/jpeg" if p.suffix.lower() in (".jpg", ".jpeg") else "image/png"
+        if is_video:
+            mime = "video/mp4"
+        else:
+            mime = "image/jpeg" if p.suffix.lower() in (".jpg", ".jpeg") else "image/png"
         files[key] = (p.name, fh, mime)
     try:
         _call(token, "sendMediaGroup", chat_id=chat_id, media=json.dumps(media), files=files)

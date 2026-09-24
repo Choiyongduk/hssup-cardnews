@@ -74,6 +74,21 @@ def publish_carousel(business_id: str, token: str, image_urls: list[str], captio
     return published["id"]
 
 
+def publish_video(business_id: str, token: str, video_url: str, caption: str) -> str:
+    """영상 1개를 Reels로 게시하고, 게시된 미디어 ID를 반환합니다.
+    영상 처리는 이미지보다 오래 걸려서 최대 5분까지 기다립니다."""
+    container = _post(
+        f"{business_id}/media",
+        media_type="REELS",
+        video_url=video_url,
+        caption=caption,
+        access_token=token,
+    )
+    _wait_until_ready(container["id"], token, timeout=300)
+    published = _post(f"{business_id}/media_publish", creation_id=container["id"], access_token=token)
+    return published["id"]
+
+
 def refresh_long_lived_token(token: str, app_id: str, app_secret: str) -> tuple[str, int]:
     """만료 전에 장기 토큰을 새 장기 토큰으로 교환합니다. (new_token, expires_in_seconds) 반환."""
     body = _get(
