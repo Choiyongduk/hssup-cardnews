@@ -27,7 +27,7 @@ jobs:
           pip install -r requirements.txt
           playwright install --with-deps chromium
 
-      - name: Poll all channel bots
+      - name: Poll all channel bots (approvals + new media)
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           PREPPY_POP_BOT_TOKEN: ${{ secrets.PREPPY_POP_BOT_TOKEN }}
@@ -37,11 +37,22 @@ jobs:
           ASSETS_REPO_TOKEN: ${{ secrets.ASSETS_REPO_TOKEN }}
         run: python poll_telegram.py
 
+      - name: Poll Instagram DMs (drafts reply, sends for approval)
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          HSSUP_ACADEMY_BOT_TOKEN: ${{ secrets.HSSUP_ACADEMY_BOT_TOKEN }}
+          ARTMAKE_BOT_TOKEN: ${{ secrets.ARTMAKE_BOT_TOKEN }}
+          HSSUP_ACADEMY_IG_BUSINESS_ID: ${{ secrets.HSSUP_ACADEMY_IG_BUSINESS_ID }}
+          HSSUP_ACADEMY_IG_TOKEN: ${{ secrets.HSSUP_ACADEMY_IG_TOKEN }}
+          ARTMAKE_IG_BUSINESS_ID: ${{ secrets.ARTMAKE_IG_BUSINESS_ID }}
+          ARTMAKE_IG_TOKEN: ${{ secrets.ARTMAKE_IG_TOKEN }}
+        run: python poll_dm.py
+
       - name: Commit new pending records and state
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add pending/ state/
-          git diff --cached --quiet || git commit -m "chore: telegram poll update [skip ci]"
+          git add pending/ pending_dm/ state/
+          git diff --cached --quiet || git commit -m "chore: telegram/dm poll update [skip ci]"
           git pull --rebase origin master
           git push

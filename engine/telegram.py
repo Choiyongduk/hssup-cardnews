@@ -83,6 +83,38 @@ def send_preview(token: str, chat_id: str, image_paths: list[Path], caption: str
     _call(token, "sendMessage", chat_id=chat_id, text=text, reply_markup=json.dumps(keyboard))
 
 
+def create_pending_dm(slug: str, dm_id: str, recipient_id: str, incoming_text: str, draft_reply: str) -> None:
+    """DM 답장 승인 대기 레코드를 만듭니다. send_dm.py가 나중에 이 파일을 읽어 실제 DM을 보냅니다."""
+    out_path = ROOT / "pending_dm" / slug / f"{dm_id}.json"
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(
+        json.dumps(
+            {
+                "status": "awaiting_approval",
+                "recipient_id": recipient_id,
+                "incoming_text": incoming_text,
+                "draft_reply": draft_reply,
+                "created_at": dt.datetime.now(dt.timezone.utc).isoformat(),
+            },
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+
+
+def send_dm_preview(token: str, chat_id: str, slug: str, dm_id: str, incoming_text: str, draft_reply: str) -> None:
+    """받은 DM 원문 + AI 답장 초안을 보여주고, 발송 승인 버튼을 보냅니다."""
+    text = f"📩 새 DM 문의\n\n\"{incoming_text}\"\n\n💬 AI 답장 초안:\n{draft_reply}\n\n이대로 보낼까요?"
+    keyboard = {
+        "inline_keyboard": [[
+            {"text": "✅ 발송", "callback_data": f"senddm:{slug}:{dm_id}"},
+            {"text": "⏭ 건너뛰기(직접 응대)", "callback_data": f"skipdm:{slug}:{dm_id}"},
+        ]]
+    }
+    _call(token, "sendMessage", chat_id=chat_id, text=text[:4000], reply_markup=json.dumps(keyboard))
+
+
 def _offset_path(bot_name: str) -> Path:
     return ROOT / "state" / f"telegram_offset_{bot_name}.json"
 
@@ -123,22 +155,28 @@ def poll(token: str, bot_name: str, inbox_chat_id: str | None = None) -> dict:
         cq = u.get("callback_query")
         if cq and "data" in cq:
             try:
-                action, slug, date = cq["data"].split(":", 2)
+                action, slug, key = cq["data"].split(":", 2)
             except ValueError:
                 continue
-            status = "approved" if action == "approve" else "skipped"
 
-            out_path = ROOT / "pending" / slug / f"{date}.json"
+            is_dm = action in ("senddm", "skipdm")
+            if is_dm:
+                status = "approved" if action == "senddm" else "skipped"
+                out_path = ROOT / "pending_dm" / slug / f"{key}.json"
+            else:
+                status = "approved" if action == "approve" else "skipped"
+                out_path = ROOT / "pending" / slug / f"{key}.json"
+
             out_path.parent.mkdir(parents=True, exist_ok=True)
             existing = json.loads(out_path.read_text(encoding="utf-8")) if out_path.exists() else {}
             existing["status"] = status
             existing["decided_at"] = dt.datetime.now(dt.timezone.utc).isoformat()
             out_path.write_text(json.dumps(existing, ensure_ascii=False, indent=2), encoding="utf-8")
-            decided.append({"slug": slug, "date": date, "status": status})
+            decided.append({"slug": slug, "date": key, "status": status, "dm": is_dm})
 
             # 콜백 응답에는 유효시간이 있어 폴링 주기보다 먼저 만료될 수 있습니다.
             # 화면 갱신이 실패해도 위의 pending/ 기록은 이미 끝났으니 무시하고 계속 진행합니다.
-            label = "✅ 게시 확정" if status == "approved" else "⏭ 건너뜀"
+            label = ("✅ 발송 확정" if is_dm else "✅ 게시 확정") if status == "approved" else "⏭ 건너뜀"
             try:
                 _call(token, "answerCallbackQuery", callback_query_id=cq["id"], text=label)
                 msg = cq["message"]

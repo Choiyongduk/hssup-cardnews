@@ -30,3 +30,13 @@ overlay:
   logo: assets/logos/hssup-academy.png
   logo_video: assets/logos/hssup-academy-white.png   # 영상 위에선 흰색 로고 사용 (배경 없이)
   brand_color: "#fa5500"   # HISSUP orange (브랜드 가이드 PANTONE 293C / R255 G122 B0)
+
+# DM 자동 응대 (poll_dm.py) — 받은 DM에 Claude가 답장 초안을 쓰고, 텔레그램으로 승인 요청을 보냅니다.
+# 처음엔 사람이 승인 후 발송, 나중에 mode를 auto로 바꾸면 AI가 바로 자동 발송하도록 확장 예정.
+dm:
+  mode: manual
+  # TODO: 실제 수강 문의 FAQ(가격, 커리큘럼, 일정, 위치 등)로 채워주세요 — 채워질수록 답장이 정확해집니다.
+  context: |
+    히썹 아카데미는 반영구 화장(눈썹, 아이라인, 입술 등) 전문 교육 기관입니다.
+    정규과정, 원데이 클래스, 해외연수 등 다양한 과정을 운영합니다.
+    구체적인 가격·일정은 아직 여기 채워지지 않았으니, 모르면 "정확한 안내를 위해 확인 후 다시 연락드리겠습니다"라고 답하세요.

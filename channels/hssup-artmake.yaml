@@ -29,3 +29,11 @@ instagram:
 overlay:
   logo: assets/logos/hssup-general.png
   brand_color: "#fa5500"   # HISSUP orange (브랜드 가이드 PANTONE 293C / R255 G122 B0)
+
+# DM 자동 응대 (poll_dm.py) — 받은 DM에 Claude가 답장 초안을 쓰고, 텔레그램으로 승인 요청을 보냅니다.
+dm:
+  mode: manual
+  # TODO: 실제 시술 문의 FAQ(가격, 예약 방법, 위치, 시술 후 관리 등)로 채워주세요.
+  context: |
+    히썹 아트메이크는 눈썹, 아이라인, 입술 등 반영구 화장 시술 전문 계정입니다.
+    구체적인 가격·예약 방법은 아직 여기 채워지지 않았으니, 모르면 "정확한 안내를 위해 확인 후 다시 연락드리겠습니다"라고 답하세요.
