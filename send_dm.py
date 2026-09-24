@@ -68,6 +68,12 @@ def main() -> int:
         data = json.loads(entry_path.read_text(encoding="utf-8"))
         if data.get("status") != "approved":
             continue
+        # 초안 없이 승인 기록만 있는 레코드(초안 파일이 커밋되기 전에 버튼이 눌린 경우 등)는
+        # 보낼 내용이 없습니다. 그냥 두면 매 실행마다 실패하며 알림을 반복하므로 건너뜁니다.
+        if not data.get("recipient_id") or not data.get("draft_reply"):
+            _write_status(entry_path, "skipped", error="초안 정보가 없어 발송할 수 없습니다")
+            print(f"  ! [{slug}] {entry_path.name}: 초안 정보 없음, 건너뜀")
+            continue
         print(f"[{slug}] DM 발송 시작")
         _send_one(slug, entry_path, data)
         count += 1
