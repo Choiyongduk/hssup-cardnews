@@ -25,10 +25,12 @@ jobs:
       - name: Install minimal dependencies
         run: pip install PyYAML python-dotenv requests
 
-      - name: Publish approved cardnews to Instagram
+      - name: Publish approved posts to Instagram
         env:
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          PREPPY_POP_BOT_TOKEN: ${{ secrets.PREPPY_POP_BOT_TOKEN }}
+          HSSUP_ACADEMY_BOT_TOKEN: ${{ secrets.HSSUP_ACADEMY_BOT_TOKEN }}
+          PREPPY_POP_IG_BUSINESS_ID: ${{ secrets.PREPPY_POP_IG_BUSINESS_ID }}
+          PREPPY_POP_IG_TOKEN: ${{ secrets.PREPPY_POP_IG_TOKEN }}
           HSSUP_IG_BUSINESS_ID: ${{ secrets.HSSUP_IG_BUSINESS_ID }}
           HSSUP_IG_TOKEN: ${{ secrets.HSSUP_IG_TOKEN }}
         run: python publish_instagram.py
