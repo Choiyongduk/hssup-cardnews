@@ -28,6 +28,13 @@ def _handle_inbox_item(cfg: dict, token: str, chat_id: str, item: dict) -> None:
     overlay_cfg = cfg.get("overlay")
     is_image = photo_path.suffix.lower() in IMAGE_EXTS
 
+    if not is_image:
+        print(f"  ! [{slug}] 영상은 아직 지원하지 않아 건너뜁니다: {photo_path.name}")
+        telegram.notify(
+            token, chat_id, f"⚠️ [{cfg['name']}] 영상은 아직 자동 처리가 안 돼요 — 사진으로 보내주세요."
+        )
+        return
+
     try:
         post = media_caption.write_post(
             photo_path, item["caption"], cfg.get("topic", cfg["name"]), cfg.get("hashtags", [])
