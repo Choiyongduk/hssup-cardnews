@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block kind %}cover{% endblock %}
+{% block content %}
+<section class="fit-box" data-name="cover">
+  <p class="kicker">오늘 꼭 알아야 할 {{ items|length }}가지</p>
+  <h1 class="headline" data-fit="60">{{ data.headline }}</h1>
+  <ol class="index">
+    {% for it in items %}
+    <li><span class="no">{{ loop.index }}</span><span data-fit="24">{{ it.title }}</span></li>
+    {% endfor %}
+  </ol>
+</section>
+{% endblock %}

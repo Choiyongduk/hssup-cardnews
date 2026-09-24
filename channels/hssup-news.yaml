@@ -1,0 +1,44 @@
+# 반영구/문신 정책·규제 뉴스 카드뉴스. RSS 자동 수집 → Claude 요약 → 카드뉴스 (cardnews 프로젝트와 동일 엔진).
+# hssup_academy 계정에 게시 (수강생·업계 관계자 대상 최신 정보 제공용).
+slug: hssup-news
+name: 히썹 반영구 뉴스
+handle: "@hssup_academy"
+template: ai-news                # templates/<template>/ 폴더 사용 (cardnews에서 이식)
+cards: 4
+palette: yellow
+topic: 반영구화장·문신 관련 정책·규제·법률 뉴스 (문신사법, 식약처 고시, 색소 안전기준, 업계 동향 등. 특정 업체 홍보성 소식 제외) # 요약 프롬프트에 쓰이는 채널 주제
+size:
+  width: 1080
+  height: 1350
+
+source:
+  type: rss
+  feeds:
+    - http://www.mfds.go.kr/www/rss/brd.do?brdId=ntc0021   # 식약처 보도자료
+    - http://www.k-health.com/rss/allArticle.xml            # 헬스경향
+    - http://www.docdocdoc.co.kr/rss/allArticle.xml         # 청년의사
+    - http://www.doctorsnews.co.kr/rss/allArticle.xml       # 의협신문
+
+limits:
+  title: 30
+  summary_line: 40
+  summary_lines: 3
+
+outro:
+  cta_title: 반영구 업계 최신 정보 받아보기
+  cta_body: 팔로우하면 문신사법·규제 동향을 가장 먼저 알려드립니다.
+
+hashtags:
+  - 히썹
+  - 반영구
+  - 문신사법
+  - 반영구화장합법화
+  - 반영구아카데미
+
+telegram:
+  bot_token_env: HSSUP_ACADEMY_BOT_TOKEN
+  chat_id: "8582929102"
+
+instagram:
+  business_id_env: HSSUP_ACADEMY_IG_BUSINESS_ID
+  token_env: HSSUP_ACADEMY_IG_TOKEN

@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="{{ css_url }}">
+<style>
+  :root {
+    --yellow: {{ theme.yellow }};
+    --pink: {{ theme.pink }};
+    --violet: {{ theme.violet }};
+  }
+</style>
+</head>
+<body>
+<main class="card {% block kind %}{% endblock %}">
+  <header class="topbar">
+    <span class="channel">{{ cfg.name }}</span>
+    <span>{{ data.date_label }}</span>
+  </header>
+  {% block content %}{% endblock %}
+  <footer class="footer">
+    <span>{{ cfg.handle }}</span>
+    <span class="page"><b>{{ page }}</b> / {{ total }}</span>
+  </footer>
+</main>
+</body>
+</html>

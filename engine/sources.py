@@ -15,8 +15,7 @@
   ]
 }
 
-TODO: 콘텐츠 전략(교육 팁 / 강좌 홍보 / 비포애프터)이 정해지면 여기에 소스 타입을 추가합니다.
-cardnews 프로젝트의 engine/sources.py, engine/summarize.py, engine/rss.py를 참고해 구조를 잡으면 됩니다.
+cardnews 프로젝트의 engine/sources.py를 그대로 이식한 RssSource를 씁니다 (반영구 정책/규제 뉴스 카드뉴스용).
 """
 from __future__ import annotations
 
@@ -31,7 +30,69 @@ class Source(ABC):
     def load(self) -> dict: ...
 
 
-REGISTRY: dict[str, type[Source]] = {}
+class RssSource(Source):
+    """RSS 수집 → 중복/사용 이력 제거 → 본문 추출 → Claude 요약.
+
+    채널 설정 예:
+    source:
+      type: rss
+      feeds:
+        - https://example.com/feed.xml
+      # model: claude-sonnet-5
+    """
+
+    def load(self) -> dict:
+        from . import rss
+        from .summarize import filter_relevant, generate
+
+        feeds = self.cfg.get("feeds") or []
+        if not feeds:
+            raise ValueError("rss 소스는 channels/<slug>.yaml의 source.feeds에 피드 URL이 최소 1개 필요합니다.")
+
+        slug = self.cfg.get("slug", "default")
+        need = self.cfg.get("cards", 4)
+        topic = self.cfg.get("topic", "뉴스")
+
+        candidates = rss.fetch_entries(feeds)
+        already_seen = set(rss.load_seen(slug))
+        candidates = [c for c in candidates if c["url"] not in already_seen]
+
+        pool = candidates[:30]
+        if pool:
+            order = filter_relevant([c["title"] for c in pool], topic, need * 3)
+            if not order:
+                raise ValueError(f"채널 주제 '{topic}'에 맞는 새 기사가 오늘은 없습니다. 다음에 다시 시도하세요.")
+            candidates = [pool[i] for i in order] + candidates[len(pool):]
+
+        articles: list[dict] = []
+        used_urls: list[str] = []
+        for c in candidates:
+            if len(articles) >= need:
+                break
+            body = rss.extract_body(c["url"])
+            if not body:
+                continue
+            articles.append(
+                {"title": c["title"], "url": c["url"], "source_name": c["source_name"], "body": body}
+            )
+            used_urls.append(c["url"])
+
+        if len(articles) < need:
+            raise ValueError(
+                f"본문 추출에 성공한 새 기사가 {len(articles)}건뿐입니다 (필요: {need}건). "
+                "피드를 추가하거나 잠시 후 다시 시도하세요."
+            )
+
+        data = generate(articles, model=self.cfg.get("model"), topic=self.cfg.get("topic", "뉴스"))
+        data.setdefault("date", None)
+
+        rss.save_seen(slug, list(already_seen) + used_urls)
+        return data
+
+
+REGISTRY: dict[str, type[Source]] = {
+    "rss": RssSource,
+}
 
 
 def get_source(source_cfg: dict) -> Source:
