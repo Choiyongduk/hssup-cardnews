@@ -28,4 +28,5 @@ instagram:
 # 보내주신 사진에 히썹 브랜드 로고+헤드라인을 자동으로 입혀서 게시 (engine/overlay.py)
 overlay:
   logo: assets/logos/hssup-academy.png
+  logo_video: assets/logos/hssup-academy-white.png   # 영상 위에선 흰색 로고 사용 (배경 없이)
   brand_color: "#fa5500"   # HISSUP orange (브랜드 가이드 PANTONE 293C / R255 G122 B0)

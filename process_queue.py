@@ -52,11 +52,12 @@ def _process_one(cfg: dict, token: str, chat_id: str, entry_path: Path) -> None:
         overlay_cfg = cfg.get("overlay")
         if overlay_cfg:
             if is_video:
+                video_logo = overlay_cfg.get("logo_video") or overlay_cfg.get("logo")
                 rendered = render_video_overlay(
                     video_path=media_path,
                     headline=post["headline"],
                     out_path=media_path.with_name(media_path.stem + "_post.mp4"),
-                    logo_path=(ROOT / overlay_cfg["logo"]) if overlay_cfg.get("logo") else None,
+                    logo_path=(ROOT / video_logo) if video_logo else None,
                     logo_text=overlay_cfg.get("logo_text"),
                     brand_color=overlay_cfg.get("brand_color", "#fa5500"),
                 )

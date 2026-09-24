@@ -15,7 +15,11 @@
     font-weight: 700;
   }
   html, body, .frame { background: transparent !important; }
-  html, body { width: {{ width }}px; height: {{ height }}px; }
+  html, body, .frame {
+    width: {{ width }}px !important;
+    height: {{ height }}px !important;
+  }
+  .caption-block { bottom: 220px !important; }
 </style>
 </head>
 <body style="--brand-color: {{ brand_color }};">
