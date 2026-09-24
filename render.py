@@ -62,7 +62,10 @@ def main() -> int:
         from engine.telegram import create_pending
 
         image_urls = assets.upload_images(pngs, cfg["slug"], key)
-        create_pending(cfg["slug"], key, image_urls, caption)
+        create_pending(
+            cfg["slug"], key, image_urls, caption,
+            headline=data.get("headline"), one_liner=data.get("one_liner"),
+        )
         print("  이미지 공개 업로드 + 승인 대기 레코드 생성 완료")
     except ValueError as e:
         print(f"  ! 이미지 업로드 건너뜀: {e}")

@@ -66,6 +66,20 @@ def _publish_one(slug: str, date: str, entry_path, data: dict) -> None:
     _write_status(entry_path, "published", media_id=media_id)
     _notify(cfg, f"✅ [{cfg['name']}] {date} 인스타그램 게시 완료 (media_id: {media_id})")
 
+    if slug == "hssup-news":
+        try:
+            from engine.trends_sync import create_trend
+
+            create_trend(
+                title=data.get("headline") or cfg["name"],
+                content=data.get("one_liner"),
+                image_urls=image_urls,
+                category="업계소식",
+            )
+            print(f"  - {slug}: 앱 트렌드 속보에도 등록 완료")
+        except Exception as e:
+            print(f"  ! {slug}: 앱 트렌드 속보 등록 실패(인스타 게시는 정상 완료됨): {e}")
+
 
 def main() -> int:
     pending_dir = ROOT / "pending"
