@@ -26,7 +26,6 @@ instagram:
   token_env: ARTMAKE_IG_TOKEN
 
 # 보내주신 사진에 히썹 브랜드 로고+헤드라인을 자동으로 입혀서 게시 (engine/overlay.py)
-# 깨끗한 로고 파일이 없어서 텍스트 로고로 대체 (나중에 전용 로고 파일 생기면 logo: 로 교체)
 overlay:
-  logo_text: "HISSUP"
+  logo: assets/logos/hssup-general.png
   brand_color: "#ff7a00"   # HISSUP orange (브랜드 가이드 PANTONE 293C / R255 G122 B0)
