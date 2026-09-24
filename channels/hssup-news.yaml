@@ -18,6 +18,9 @@ source:
     - http://www.k-health.com/rss/allArticle.xml            # 헬스경향
     - http://www.docdocdoc.co.kr/rss/allArticle.xml         # 청년의사
     - http://www.doctorsnews.co.kr/rss/allArticle.xml       # 의협신문
+    - https://www.yna.co.kr/rss/society.xml                 # 연합뉴스 사회
+    - https://newsis.com/RSS/society.xml                    # 뉴시스 사회
+    - https://news.sbs.co.kr/news/SectionRssFeed.do?sectionId=01&plink=RSSREADER   # SBS 전체
 
 limits:
   title: 30
