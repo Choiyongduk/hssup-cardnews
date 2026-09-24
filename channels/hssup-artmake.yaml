@@ -11,7 +11,7 @@ source:
 
 telegram:
   bot_token_env: ARTMAKE_BOT_TOKEN
-  chat_id: ""                    # TODO: 봇에 메시지 보낸 후 chat_id로 채우기
+  chat_id: "8582929102"
 
 hashtags:
   - 히썹
