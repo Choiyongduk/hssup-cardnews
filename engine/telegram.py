@@ -24,10 +24,13 @@ API = "https://api.telegram.org/bot{token}/{method}"
 def _call(token: str, method: str, files: dict | None = None, **params) -> dict:
     url = API.format(token=token, method=method)
     resp = requests.post(url, data=params, files=files, timeout=30)
-    resp.raise_for_status()
-    body = resp.json()
+    try:
+        body = resp.json()
+    except ValueError:
+        resp.raise_for_status()
+        raise
     if not body.get("ok"):
-        raise RuntimeError(f"텔레그램 API 오류({method}): {body}")
+        raise RuntimeError(f"텔레그램 API 오류({method}): {body.get('description', body)}")
     return body["result"]
 
 
@@ -174,11 +177,16 @@ def poll(token: str, bot_name: str, inbox_chat_id: str | None = None) -> dict:
             out_path.write_text(json.dumps(existing, ensure_ascii=False, indent=2), encoding="utf-8")
             decided.append({"slug": slug, "date": key, "status": status, "dm": is_dm})
 
-            # 콜백 응답에는 유효시간이 있어 폴링 주기보다 먼저 만료될 수 있습니다.
-            # 화면 갱신이 실패해도 위의 pending/ 기록은 이미 끝났으니 무시하고 계속 진행합니다.
             label = ("✅ 발송 확정" if is_dm else "✅ 게시 확정") if status == "approved" else "⏭ 건너뜀"
+
+            # 콜백 응답에는 유효시간이 있어 폴링 주기보다 먼저 만료되곤 합니다.
+            # 버튼 라벨 갱신은 콜백 ID와 무관하므로, 하나가 실패해도 다른 하나는 되도록 따로 호출합니다.
             try:
                 _call(token, "answerCallbackQuery", callback_query_id=cq["id"], text=label)
+            except Exception:
+                pass
+
+            try:
                 msg = cq["message"]
                 _call(
                     token,
@@ -188,7 +196,7 @@ def poll(token: str, bot_name: str, inbox_chat_id: str | None = None) -> dict:
                     reply_markup=json.dumps({"inline_keyboard": [[{"text": label, "callback_data": "noop"}]]}),
                 )
             except Exception as e:
-                print(f"  ! 텔레그램 UI 갱신 실패(응답 만료 가능성, 기록은 정상 반영됨): {e}")
+                print(f"  ! 텔레그램 버튼 갱신 실패(기록은 정상 반영됨): {e}")
             continue
 
         msg = u.get("message")
