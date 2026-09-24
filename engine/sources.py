@@ -57,6 +57,14 @@ class RssSource(Source):
         already_seen = set(rss.load_seen(slug))
         candidates = [c for c in candidates if c["url"] not in already_seen]
 
+        require_keywords = self.cfg.get("require_keywords") or []
+        if require_keywords:
+            candidates = [c for c in candidates if any(k in c["title"] for k in require_keywords)]
+            if not candidates:
+                raise ValueError(
+                    f"제목에 {require_keywords} 키워드가 포함된 새 기사가 오늘은 없습니다. 다음에 다시 시도하세요."
+                )
+
         pool = candidates[:30]
         if pool:
             order = filter_relevant([c["title"] for c in pool], topic, need * 3)

@@ -13,6 +13,7 @@ size:
 
 source:
   type: rss
+  require_keywords: ["반영구"]     # 제목에 이 단어가 실제로 있는 기사만 통과 (반영구화장/반영구색소 등 전부 포함)
   feeds:
     - http://www.mfds.go.kr/www/rss/brd.do?brdId=ntc0021   # 식약처 보도자료
     - http://www.k-health.com/rss/allArticle.xml            # 헬스경향
