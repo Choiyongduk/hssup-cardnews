@@ -38,7 +38,7 @@ def render_overlay(
     out_path: Path,
     logo_path: Path | None = None,
     logo_text: str | None = None,
-    brand_color: str = "#ff7a00",
+    brand_color: str = "#fa5500",
     width: int = 1080,
     height: int = 1350,
 ) -> Path:

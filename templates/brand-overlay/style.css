@@ -66,7 +66,7 @@ html, body {
 .accent-bar {
   width: 64px;
   height: 8px;
-  background: var(--brand-color, #ff7a00);
+  background: var(--brand-color, #fa5500);
   border-radius: 4px;
   margin-bottom: 24px;
 }

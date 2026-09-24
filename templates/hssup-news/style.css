@@ -1,4 +1,4 @@
-/* hssup-news 테마: HISSUP 브랜드(오렌지 #FF7A00 + 블랙 + 화이트) 고정 팔레트. */
+/* hssup-news 테마: HISSUP 브랜드(오렌지 #FA5500 + 블랙 + 화이트) 고정 팔레트. */
 @font-face { font-family: "Pretendard"; font-weight: 400; src: url("../../assets/fonts/Pretendard-Regular.woff2") format("woff2"); }
 @font-face { font-family: "Pretendard"; font-weight: 500; src: url("../../assets/fonts/Pretendard-Medium.woff2") format("woff2"); }
 @font-face { font-family: "Pretendard"; font-weight: 600; src: url("../../assets/fonts/Pretendard-SemiBold.woff2") format("woff2"); }
@@ -8,7 +8,7 @@
 :root {
   --ink: #0A0A0A;          /* 블랙 배경/텍스트 */
   --paper: #FFFFFF;        /* 화이트 배경 */
-  --orange: #FF7A00;       /* HISSUP 시그니처 오렌지 */
+  --orange: #FA5500;       /* HISSUP 시그니처 오렌지 */
   --muted: rgba(10, 10, 10, 0.55);
   --muted-on-dark: rgba(255, 255, 255, 0.6);
   --line: rgba(10, 10, 10, 0.14);

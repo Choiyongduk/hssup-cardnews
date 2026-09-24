@@ -58,7 +58,7 @@ def _process_one(cfg: dict, token: str, chat_id: str, entry_path: Path) -> None:
                     out_path=media_path.with_name(media_path.stem + "_post.mp4"),
                     logo_path=(ROOT / overlay_cfg["logo"]) if overlay_cfg.get("logo") else None,
                     logo_text=overlay_cfg.get("logo_text"),
-                    brand_color=overlay_cfg.get("brand_color", "#ff7a00"),
+                    brand_color=overlay_cfg.get("brand_color", "#fa5500"),
                 )
             else:
                 rendered = render_overlay(
@@ -67,7 +67,7 @@ def _process_one(cfg: dict, token: str, chat_id: str, entry_path: Path) -> None:
                     out_path=media_path.with_name(media_path.stem + "_post.png"),
                     logo_path=(ROOT / overlay_cfg["logo"]) if overlay_cfg.get("logo") else None,
                     logo_text=overlay_cfg.get("logo_text"),
-                    brand_color=overlay_cfg.get("brand_color", "#ff7a00"),
+                    brand_color=overlay_cfg.get("brand_color", "#fa5500"),
                 )
             post_paths = [rendered]
 
