@@ -157,7 +157,13 @@ def poll(token: str, bot_name: str, inbox_chat_id: str | None = None) -> dict:
         if msg and inbox_chat_id and str(msg.get("chat", {}).get("id")) == str(inbox_chat_id):
             photos = msg.get("photo")
             video = msg.get("video")
-            if not photos and not video:
+            # "파일로 보내기"(갤러리 선택이 아닌 첨부)로 보내면 photo/video가 아니라
+            # document로 옵니다 — mime_type이 이미지/영상이면 같은 방식으로 처리합니다.
+            document = msg.get("document")
+            doc_mime = (document or {}).get("mime_type", "")
+            if document and not (doc_mime.startswith("image/") or doc_mime.startswith("video/")):
+                document = None
+            if not photos and not video and not document:
                 continue
             dest_dir = ROOT / "state" / "inbox" / bot_name / str(u["update_id"])
             paths = []
@@ -166,6 +172,8 @@ def poll(token: str, bot_name: str, inbox_chat_id: str | None = None) -> dict:
                 paths.append(_download_file(token, largest["file_id"], dest_dir))
             if video:
                 paths.append(_download_file(token, video["file_id"], dest_dir))
+            if document:
+                paths.append(_download_file(token, document["file_id"], dest_dir))
             inbox.append({"paths": paths, "caption": msg.get("caption", ""), "message_id": msg["message_id"]})
 
     offset_path.parent.mkdir(parents=True, exist_ok=True)
