@@ -1,6 +1,6 @@
 {
-  "status": "failed",
-  "decided_at": "2026-09-24T16:57:52.833179+00:00",
+  "status": "approved",
+  "decided_at": "2026-09-24T17:01:13.165841+00:00",
   "sent_at": "2026-09-24T16:58:15.760120+00:00",
   "error": "'recipient_id'"
 }
