@@ -1,31 +1,27 @@
 """사용법: python poll_telegram.py
 channels/*.yaml에 정의된 채널마다 각자의 텔레그램 봇을 폴링합니다.
 - 모든 채널: 승인/건너뛰기 버튼 응답을 pending/<slug>/<date>.json에 반영
-- source.type이 telegram_inbox인 채널: 새로 들어온 사진/영상 + 설명을 감지해서
-  Claude로 캡션을 작성하고, 공개 저장소에 올린 뒤, 승인 대기 미리보기를 다시 전송합니다.
+- source.type이 telegram_inbox인 채널: 새로 들어온 사진 + 설명을 감지해서
+  queue/<slug>/에 대기열로 등록합니다 (캡션 작성·게시는 process_queue.py가 매일 하나씩 처리).
 """
 from __future__ import annotations
 
 import datetime as dt
+import json
 import os
 import sys
 
 import yaml
 
-from engine import assets, media_caption, telegram
+from engine import assets, telegram
 from engine.config import ROOT
-from engine.overlay import render_overlay
 
 IMAGE_EXTS = {".jpg", ".jpeg", ".png"}
 
 
-def _handle_inbox_item(cfg: dict, token: str, chat_id: str, item: dict) -> None:
+def _enqueue_inbox_item(cfg: dict, token: str, chat_id: str, item: dict) -> None:
     slug = cfg["slug"]
-    date_key = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%d-%H%M%S")
-    print(f"  - [{slug}] 새 미디어 수신, 캡션 작성 중...")
-
     photo_path = item["paths"][0]
-    overlay_cfg = cfg.get("overlay")
     is_image = photo_path.suffix.lower() in IMAGE_EXTS
 
     if not is_image:
@@ -35,38 +31,40 @@ def _handle_inbox_item(cfg: dict, token: str, chat_id: str, item: dict) -> None:
         )
         return
 
+    ts = dt.datetime.now(dt.timezone.utc).strftime("%Y%m%d-%H%M%S")
     try:
-        post = media_caption.write_post(
-            photo_path, item["caption"], cfg.get("topic", cfg["name"]), cfg.get("hashtags", [])
-        )
-        caption = post["caption"]
-
-        post_paths = item["paths"]
-        if overlay_cfg and is_image:
-            rendered = render_overlay(
-                photo_path=photo_path,
-                headline=post["headline"],
-                out_path=photo_path.with_name(photo_path.stem + "_post.png"),
-                logo_path=(ROOT / overlay_cfg["logo"]) if overlay_cfg.get("logo") else None,
-                logo_text=overlay_cfg.get("logo_text"),
-                brand_color=overlay_cfg.get("brand_color", "#ff7a00"),
-            )
-            post_paths = [rendered]
-
-        image_urls = assets.upload_images(post_paths, slug, date_key)
+        image_urls = assets.upload_images([photo_path], slug, f"queue/{ts}")
     except Exception as e:
-        print(f"  ! [{slug}] 처리 실패: {e}")
+        print(f"  ! [{slug}] 대기열 등록 실패: {e}")
         try:
-            telegram.notify(token, chat_id, f"❌ [{cfg['name']}] 사진 처리 중 오류: {e}")
+            telegram.notify(token, chat_id, f"❌ [{cfg['name']}] 대기열 등록 실패: {e}")
         except Exception:
             pass
         return
 
-    telegram.create_pending(
-        slug, date_key, image_urls, caption, source_message_id=item["message_id"]
+    queue_dir = ROOT / "queue" / slug
+    queue_dir.mkdir(parents=True, exist_ok=True)
+    entry_path = queue_dir / f"{ts}-{item['message_id']}.json"
+    entry_path.write_text(
+        json.dumps(
+            {
+                "image_url": image_urls[0],
+                "user_caption": item["caption"],
+                "message_id": item["message_id"],
+                "queued_at": dt.datetime.now(dt.timezone.utc).isoformat(),
+            },
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding="utf-8",
     )
-    telegram.send_preview(token, chat_id, post_paths, caption, slug, date_key)
-    print(f"  - [{slug}] {date_key} 미리보기 전송 완료")
+    pending_count = len(list(queue_dir.glob("*.json")))
+    telegram.notify(
+        token,
+        chat_id,
+        f"📥 [{cfg['name']}] 대기열에 추가했어요 (현재 {pending_count}개 대기 중, 매일 순서대로 하나씩 게시돼요)",
+    )
+    print(f"  - [{slug}] 대기열에 추가 (총 {pending_count}개)")
 
 
 def _process_channel(path) -> None:
@@ -88,7 +86,7 @@ def _process_channel(path) -> None:
         print(f"  - [{cfg['slug']}] {d['date']}: {d['status']}")
 
     for item in result["inbox"]:
-        _handle_inbox_item(cfg, token, chat_id, item)
+        _enqueue_inbox_item(cfg, token, chat_id, item)
 
 
 def main() -> int:
