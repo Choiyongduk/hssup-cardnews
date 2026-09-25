@@ -1,0 +1,31 @@
+name: Token Check
+
+on:
+  schedule:
+    - cron: "17 0 * * *"  # 매일 09:17 KST — 만료돼도 당장 깨지진 않으므로 cron-job.org 없이 schedule로 충분
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install requests pyyaml python-dotenv
+
+      - name: Check Instagram token health
+        env:
+          FB_APP_ID: ${{ secrets.FB_APP_ID }}
+          FB_APP_SECRET: ${{ secrets.FB_APP_SECRET }}
+          HSSUP_ACADEMY_IG_TOKEN: ${{ secrets.HSSUP_ACADEMY_IG_TOKEN }}
+          ARTMAKE_IG_TOKEN: ${{ secrets.ARTMAKE_IG_TOKEN }}
+          PREPPY_POP_IG_TOKEN: ${{ secrets.PREPPY_POP_IG_TOKEN }}
+          HSSUP_ACADEMY_BOT_TOKEN: ${{ secrets.HSSUP_ACADEMY_BOT_TOKEN }}
+          ARTMAKE_BOT_TOKEN: ${{ secrets.ARTMAKE_BOT_TOKEN }}
+          PREPPY_POP_BOT_TOKEN: ${{ secrets.PREPPY_POP_BOT_TOKEN }}
+        run: python check_tokens.py
