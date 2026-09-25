@@ -1,0 +1,48 @@
+name: Feed Analysis
+
+# 주기 실행은 메인 계정(h_ssup_)을 연결하고 게시가 재개된 뒤에 붙입니다.
+# 지금 주간으로 돌리면 "게시물 없음" 리포트만 반복됩니다.
+on:
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: 분석할 채널 slug
+        required: true
+        default: hssup-academy
+      days:
+        description: 분석 기간(일)
+        required: false
+        default: "90"
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Analyze feed
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          HSSUP_ACADEMY_IG_BUSINESS_ID: ${{ secrets.HSSUP_ACADEMY_IG_BUSINESS_ID }}
+          HSSUP_ACADEMY_IG_TOKEN: ${{ secrets.HSSUP_ACADEMY_IG_TOKEN }}
+          ARTMAKE_IG_BUSINESS_ID: ${{ secrets.ARTMAKE_IG_BUSINESS_ID }}
+          ARTMAKE_IG_TOKEN: ${{ secrets.ARTMAKE_IG_TOKEN }}
+          PREPPY_POP_IG_BUSINESS_ID: ${{ secrets.PREPPY_POP_IG_BUSINESS_ID }}
+          PREPPY_POP_IG_TOKEN: ${{ secrets.PREPPY_POP_IG_TOKEN }}
+          HSSUP_ACADEMY_BOT_TOKEN: ${{ secrets.HSSUP_ACADEMY_BOT_TOKEN }}
+          ARTMAKE_BOT_TOKEN: ${{ secrets.ARTMAKE_BOT_TOKEN }}
+          PREPPY_POP_BOT_TOKEN: ${{ secrets.PREPPY_POP_BOT_TOKEN }}
+        run: python analyze_feed.py --channel "${{ inputs.channel }}" --days "${{ inputs.days }}"
+
+      - name: Upload report
+        uses: actions/upload-artifact@v4
+        with:
+          name: feed-analysis-${{ inputs.channel }}
+          path: output/analysis/
