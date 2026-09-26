@@ -1,0 +1,20 @@
+# 직원 계정 주간 분석 설정 (analyze_staff.py)
+#
+# 직원 개인 계정이라 우리가 소유한 게 아니어서, 인스타그램이 공개하는 데이터만 봅니다.
+# 도달·저장·공유는 나오지 않고 좋아요와 댓글만 나옵니다.
+# 좋아요 수를 숨긴 계정은 전부 0으로 내려와 분석이 의미 없어지니, 그런 계정은 빼는 게 낫습니다.
+
+# 남의 계정을 조회하려면 우리 비즈니스 계정 하나를 창구로 써야 합니다.
+observer:
+  business_id_env: HSSUP_MAIN_IG_BUSINESS_ID
+  token_env: HSSUP_MAIN_IG_TOKEN
+
+telegram:
+  bot_token_env: HSSUP_ACADEMY_BOT_TOKEN
+  chat_id: "8582929102"
+
+accounts:
+  - username: h_ssup_surin
+    name: 수린
+  - username: h_ssup_vivi
+    name: 비비

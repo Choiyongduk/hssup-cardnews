@@ -1,0 +1,38 @@
+name: Staff Analysis
+
+on:
+  schedule:
+    - cron: "20 0 * * 1"  # 매주 월요일 09:20 KST — 주간 회의 전에 받아보는 용도
+  workflow_dispatch:
+    inputs:
+      days:
+        description: 분석 기간(일)
+        required: false
+        default: "28"
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Analyze staff accounts
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          HSSUP_MAIN_IG_BUSINESS_ID: ${{ secrets.HSSUP_MAIN_IG_BUSINESS_ID }}
+          HSSUP_MAIN_IG_TOKEN: ${{ secrets.HSSUP_MAIN_IG_TOKEN }}
+          HSSUP_ACADEMY_BOT_TOKEN: ${{ secrets.HSSUP_ACADEMY_BOT_TOKEN }}
+        run: python analyze_staff.py --days "${{ inputs.days || '28' }}"
+
+      - name: Upload report
+        uses: actions/upload-artifact@v4
+        with:
+          name: staff-analysis
+          path: output/analysis/staff/

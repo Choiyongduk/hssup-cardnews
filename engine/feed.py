@@ -75,6 +75,34 @@ def fetch_media(business_id: str, token: str, since: dt.datetime, max_pages: int
     return out
 
 
+def fetch_public(observer_id: str, token: str, username: str, since: dt.datetime, limit: int = 50):
+    """남의 공개 비즈니스 계정을 business_discovery로 조회합니다.
+
+    우리가 소유한 계정이 아니므로 도달·저장·공유는 나오지 않고,
+    공개된 좋아요와 댓글만 볼 수 있습니다. 좋아요를 숨긴 계정은 0으로 내려옵니다.
+    """
+    fields = (
+        f"business_discovery.username({username})"
+        f"{{username,followers_count,media_count,"
+        f"media.limit({limit}){{id,caption,media_type,media_product_type,timestamp,like_count,comments_count,permalink}}}}"
+    )
+    body = requests.get(
+        f"{API}/{observer_id}", params={"fields": fields, "access_token": token}, timeout=30
+    ).json()
+    if "error" in body:
+        raise RuntimeError(f"@{username} 조회 실패: {body['error'].get('message')}")
+
+    account = body["business_discovery"]
+    media = []
+    for m in account.pop("media", {}).get("data", []):
+        when = dt.datetime.fromisoformat(m["timestamp"].replace("+0000", "+00:00"))
+        if when < since:
+            continue
+        m["_when"] = when
+        media.append(m)
+    return account, media
+
+
 def _hashtags(caption: str) -> list[str]:
     return re.findall(r"#([\w가-힣]+)", caption or "")
 
