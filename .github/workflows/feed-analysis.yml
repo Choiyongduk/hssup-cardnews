@@ -30,6 +30,8 @@ jobs:
       - name: Analyze feed
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          HSSUP_MAIN_IG_BUSINESS_ID: ${{ secrets.HSSUP_MAIN_IG_BUSINESS_ID }}
+          HSSUP_MAIN_IG_TOKEN: ${{ secrets.HSSUP_MAIN_IG_TOKEN }}
           HSSUP_ACADEMY_IG_BUSINESS_ID: ${{ secrets.HSSUP_ACADEMY_IG_BUSINESS_ID }}
           HSSUP_ACADEMY_IG_TOKEN: ${{ secrets.HSSUP_ACADEMY_IG_TOKEN }}
           ARTMAKE_IG_BUSINESS_ID: ${{ secrets.ARTMAKE_IG_BUSINESS_ID }}

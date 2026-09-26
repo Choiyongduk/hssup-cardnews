@@ -1,0 +1,17 @@
+# 히썹 메인 계정 (@h_ssup_). 자동 게시 채널이 아니라 **분석 대상**입니다.
+# analyze_feed.py가 이 설정을 읽어 피드를 분석하고 텔레그램으로 리포트를 보냅니다.
+slug: hssup-main
+name: 히썹 메인
+handle: "@h_ssup_"
+topic: 히썹 반영구 브랜드 메인 계정 (시술 사례, 아카데미, 브랜드 소식)
+
+source:
+  type: none   # 이 채널은 게시하지 않습니다
+
+telegram:
+  bot_token_env: HSSUP_ACADEMY_BOT_TOKEN   # 리포트는 아카데미 봇으로 받습니다
+  chat_id: "8582929102"
+
+instagram:
+  business_id_env: HSSUP_MAIN_IG_BUSINESS_ID
+  token_env: HSSUP_MAIN_IG_TOKEN

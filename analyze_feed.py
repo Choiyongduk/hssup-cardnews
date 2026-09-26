@@ -28,6 +28,7 @@ SYSTEM = """당신은 {name} 인스타그램 계정을 담당하는 콘텐츠 �
 
 원칙:
 - 주어진 숫자만 근거로 쓰세요. 없는 수치를 지어내지 마세요.
+- 저장과 공유는 "도움이 됐다"는 신호라 좋아요보다 무겁게 보세요. 도달은 알고리즘이 얼마나 밀어줬는지를 뜻합니다.
 - 게시물이 적거나 참여가 거의 없어 판단할 수 없으면, 억지로 결론 내지 말고 "데이터가 부족하다"고 쓰고 무엇이 더 필요한지 적으세요.
 - 일반론("꾸준히 올리세요", "해시태그를 활용하세요") 말고, 이 계정의 실제 게시물을 근거로 구체적으로 쓰세요.
 - 제안은 바로 실행할 수 있는 형태로. 콘텐츠 주제는 실제 캡션으로 쓸 수 있을 만큼 구체적으로.
@@ -44,13 +45,18 @@ SYSTEM = """당신은 {name} 인스타그램 계정을 담당하는 콘텐츠 �
 
 def _fmt_post(m: dict, cap: int = 200) -> dict:
     caption = (m.get("caption") or "").replace("\n", " ")
-    return {
+    out = {
         "날짜": m["_when"].astimezone(feed.KST).strftime("%Y-%m-%d"),
         "유형": m.get("media_product_type"),
         "좋아요": m.get("like_count"),
         "댓글": m.get("comments_count"),
-        "캡션": caption[:cap],
     }
+    if m.get("reach") is not None:
+        out["도달"] = m["reach"]
+        out["저장"] = m.get("saved")
+        out["공유"] = m.get("shares")
+    out["캡션"] = caption[:cap]
+    return out
 
 
 def build_prompt(account: dict, stats: dict, days: int) -> str:
@@ -66,8 +72,14 @@ def build_prompt(account: dict, stats: dict, days: int) -> str:
         "마지막_게시": stats.get("latest_post"),
         "마지막_게시_후_경과일": stats.get("days_since_last_post"),
         "게시물당_평균_참여": stats.get("avg_engagement"),
-        "참여율_퍼센트": stats.get("engagement_rate_pct"),
+        "참여율_팔로워대비_퍼센트": stats.get("engagement_rate_pct"),
+        "평균_도달": stats.get("avg_reach"),
+        "평균_저장": stats.get("avg_saved"),
+        "평균_공유": stats.get("avg_shares"),
+        "참여율_도달대비_퍼센트": stats.get("engagement_per_reach_pct"),
+        "도달_팔로워대비_퍼센트": stats.get("reach_vs_followers_pct"),
         "유형별": stats.get("by_type"),
+        "유형별_도달": stats.get("by_type_reach"),
         "요일별": by_weekday,
         "시간대별": stats.get("by_hour"),
         "해시태그": stats.get("top_hashtags"),

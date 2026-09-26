@@ -13,7 +13,10 @@ import requests
 
 API = "https://graph.facebook.com/v21.0"
 
-MEDIA_FIELDS = "id,caption,media_type,media_product_type,timestamp,like_count,comments_count,permalink"
+BASE_FIELDS = "id,caption,media_type,media_product_type,timestamp,like_count,comments_count,permalink"
+# 도달·저장·공유는 instagram_manage_insights 권한이 있어야 나옵니다. 없으면 BASE_FIELDS로 물러납니다.
+INSIGHT_METRICS = "reach,saved,shares"
+MEDIA_FIELDS = f"{BASE_FIELDS},insights.metric({INSIGHT_METRICS})"
 KST = dt.timezone(dt.timedelta(hours=9))
 
 
@@ -29,24 +32,40 @@ def fetch_account(business_id: str, token: str) -> dict:
     return body
 
 
+def _flatten_insights(m: dict) -> None:
+    """insights 응답을 게시물 딕셔너리에 평평하게 올려둡니다."""
+    for item in (m.pop("insights", {}) or {}).get("data", []):
+        values = item.get("values") or [{}]
+        m[item["name"]] = values[0].get("value")
+
+
 def fetch_media(business_id: str, token: str, since: dt.datetime, max_pages: int = 10) -> list[dict]:
-    """since 이후 게시물을 최신순으로 가져옵니다."""
+    """since 이후 게시물을 최신순으로 가져옵니다.
+
+    인사이트 권한이 없으면 기본 필드만으로 다시 시도합니다 (분석이 얕아질 뿐 동작은 합니다).
+    """
     url = f"{API}/{business_id}/media"
-    params = {"fields": MEDIA_FIELDS, "limit": 100, "access_token": token}
+    fields = MEDIA_FIELDS
+    params = {"fields": fields, "limit": 100, "access_token": token}
     out: list[dict] = []
 
     for _ in range(max_pages):
         body = requests.get(url, params=params, timeout=30).json()
         params = None
         if "error" in body:
+            if fields == MEDIA_FIELDS and not out:
+                fields = BASE_FIELDS
+                url = f"{API}/{business_id}/media"
+                params = {"fields": fields, "limit": 100, "access_token": token}
+                continue
             raise RuntimeError(f"게시물 조회 실패: {body['error'].get('message')}")
 
-        page = body.get("data", [])
-        for m in page:
+        for m in body.get("data", []):
             when = dt.datetime.fromisoformat(m["timestamp"].replace("+0000", "+00:00"))
             if when < since:
                 return out
             m["_when"] = when
+            _flatten_insights(m)
             out.append(m)
 
         url = body.get("paging", {}).get("next")
@@ -61,7 +80,13 @@ def _hashtags(caption: str) -> list[str]:
 
 
 def _engagement(m: dict) -> int:
-    return (m.get("like_count") or 0) + (m.get("comments_count") or 0)
+    """저장과 공유는 '도움이 됐다'는 신호라 좋아요보다 의미가 큽니다. 있으면 함께 셉니다."""
+    return (
+        (m.get("like_count") or 0)
+        + (m.get("comments_count") or 0)
+        + (m.get("saved") or 0)
+        + (m.get("shares") or 0)
+    )
 
 
 def summarize(account: dict, media: list[dict]) -> dict:
@@ -78,6 +103,7 @@ def summarize(account: dict, media: list[dict]) -> dict:
     total_eng = sum(_engagement(m) for m in media)
 
     by_type: dict[str, list[int]] = {}
+    by_type_reach: dict[str, list[int]] = {}
     by_weekday: dict[int, list[int]] = {}
     by_hour: dict[int, list[int]] = {}
     tag_counter: Counter[str] = Counter()
@@ -85,7 +111,10 @@ def summarize(account: dict, media: list[dict]) -> dict:
 
     for m in media:
         eng = _engagement(m)
-        by_type.setdefault(m.get("media_product_type") or "UNKNOWN", []).append(eng)
+        kind = m.get("media_product_type") or "UNKNOWN"
+        by_type.setdefault(kind, []).append(eng)
+        if m.get("reach") is not None:
+            by_type_reach.setdefault(kind, []).append(m["reach"])
         local = m["_when"].astimezone(KST)
         by_weekday.setdefault(local.weekday(), []).append(eng)
         by_hour.setdefault(local.hour, []).append(eng)
@@ -97,8 +126,12 @@ def summarize(account: dict, media: list[dict]) -> dict:
         return round(sum(values) / len(values), 1) if values else 0.0
 
     ranked = sorted(media, key=_engagement, reverse=True)
+    reaches = [m["reach"] for m in media if m.get("reach") is not None]
+    saves = [m["saved"] for m in media if m.get("saved") is not None]
+    shares = [m["shares"] for m in media if m.get("shares") is not None]
+    total_reach = sum(reaches)
 
-    return {
+    stats = {
         "followers": followers,
         "post_count": len(media),
         "span_days": span_days,
@@ -116,3 +149,17 @@ def summarize(account: dict, media: list[dict]) -> dict:
         "top_posts": ranked[:5],
         "bottom_posts": ranked[-5:] if len(ranked) > 5 else [],
     }
+
+    if reaches:
+        # 도달 대비 참여율은 계정 규모와 무관하게 "이 콘텐츠가 통했나"를 보여줍니다.
+        # 게시물별로 내면 도달이 작은 글이 과대평가되므로 전체 합으로 계산합니다.
+        stats["avg_reach"] = avg(reaches)
+        stats["avg_saved"] = avg(saves)
+        stats["avg_shares"] = avg(shares)
+        stats["engagement_per_reach_pct"] = round(total_eng / total_reach * 100, 2) if total_reach else 0.0
+        stats["reach_vs_followers_pct"] = round(avg(reaches) / followers * 100, 1) if followers else 0.0
+        stats["by_type_reach"] = {
+            k: {"count": len(v), "avg_reach": avg(v)} for k, v in by_type_reach.items()
+        }
+
+    return stats
