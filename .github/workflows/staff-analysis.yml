@@ -1,5 +1,8 @@
 name: Staff Analysis
 
+permissions:
+  contents: write
+
 on:
   schedule:
     - cron: "20 0 * * 1"  # 매주 월요일 09:20 KST — 주간 회의 전에 받아보는 용도
@@ -30,6 +33,15 @@ jobs:
           HSSUP_MAIN_IG_TOKEN: ${{ secrets.HSSUP_MAIN_IG_TOKEN }}
           HSSUP_ACADEMY_BOT_TOKEN: ${{ secrets.HSSUP_ACADEMY_BOT_TOKEN }}
         run: python analyze_staff.py --days "${{ inputs.days || '28' }}"
+
+      - name: Commit follower history
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add state/follower_history.json
+          git diff --cached --quiet || git commit -m "chore: record follower counts [skip ci]"
+          git pull --rebase origin master
+          git push
 
       - name: Upload report
         uses: actions/upload-artifact@v4
