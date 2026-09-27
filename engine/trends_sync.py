@@ -171,6 +171,36 @@ def mark_answered(message_id: int) -> None:
         raise RuntimeError(f"메시지 상태 갱신 실패: {resp.status_code} {resp.text}")
 
 
+def update_report(report_id: int, body: str) -> None:
+    """리포트 본문을 고쳐 씁니다. 원장 피드백을 반영해 다시 쓸 때 사용합니다.
+    고치기 전 내용은 대화 기록이 남기므로 따로 보관하지 않습니다."""
+    url = os.environ.get("SUPABASE_URL")
+    key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+    resp = requests.patch(
+        f"{url}/rest/v1/ai_reports",
+        headers={
+            "apikey": key,
+            "Authorization": f"Bearer {key}",
+            "Content-Type": "application/json",
+            "Prefer": "return=minimal",
+        },
+        params={"id": f"eq.{report_id}"},
+        json={"body": body},
+        timeout=30,
+    )
+    if resp.status_code not in (200, 204):
+        raise RuntimeError(f"리포트 수정 실패: {resp.status_code} {resp.text}")
+
+
+def fetch_recent_reports(exclude_id: int | None = None, limit: int = 6) -> list[dict]:
+    """동료들이 최근에 낸 결과물. 대화 중에 "지난주 대비" 같은 질문에 답하려면 필요합니다."""
+    rows = _get(
+        "ai_reports",
+        {"select": "id,kind,title,body,created_at", "order": "created_at.desc", "limit": str(limit)},
+    )
+    return [r for r in rows if r["id"] != exclude_id]
+
+
 def fetch_latest_report(kind: str) -> dict | None:
     """같은 종류의 가장 최근 리포트를 가져옵니다. 한 직원의 결과물을 다음 직원이 읽을 때 씁니다."""
     url = os.environ.get("SUPABASE_URL")
