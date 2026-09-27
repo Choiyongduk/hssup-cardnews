@@ -38,6 +38,17 @@ SYSTEM = """당신은 {name} 인스타그램 계정의 콘텐츠 기획자입니
 - 명사 3개 이상을 가운뎃점(·)으로 나열하지 마세요.
 - 한자를 쓰지 마세요.
 
+먼저 "## 지난 제안 점검" 을 쓰세요. 지난번 기획안과 그 이후 실제로 올라간 게시물을 함께 줍니다.
+- 지난 제안 하나하나가 실행됐는지 판단하세요. 형식이나 소재가 달라도 같은 의도면 실행된 것으로 봅니다.
+- 실행된 것은 실제 성과(도달, 저장)를 적고, 예상과 맞았는지 한 줄로 평가하세요.
+- 안 올라간 것은 그렇게만 적으세요. 이유를 추측하거나 재촉하지 마세요.
+- 실행 여부는 **"지난_기획안_이후_올라간_게시물"만** 근거로 판단하세요. 그 목록이 비어 있으면 아무것도 안 올라간 것입니다.
+  그보다 오래된 게시물을 "그 사이에 올라간 것"처럼 쓰지 마세요.
+- 지난 제안이 없으면 "첫 기획이라 점검할 내역이 없습니다" 라고만 쓰세요.
+
+그리고 이번 기획을 쓸 때 **지난 점검 결과를 반영하세요.** 통한 방향은 이어가고, 안 통한 건 되풀이하지 마세요.
+안 올라간 제안이 여전히 좋다고 판단되면 다시 제안해도 됩니다. 대신 왜 다시 올리는지 밝히세요.
+
 각 기획안은 이 형식으로 쓰세요:
 
 ## 기획 N. (제목)
@@ -79,6 +90,18 @@ def main() -> int:
     except Exception as e:
         print(f"  ! 피드 분석 리포트를 읽지 못했습니다: {e}")
 
+    # 2) 지난 기획안을 읽습니다. 제안이 실행됐는지 확인해야 흐름이 한 바퀴 돕니다.
+    previous = None
+    previous_at = None
+    try:
+        row = trends_sync.fetch_latest_report("plan")
+        if row:
+            previous = row["body"]
+            previous_at = dt.datetime.fromisoformat(row["created_at"].replace("Z", "+00:00"))
+            print(f"지난 기획안 참고: {row['title']}")
+    except Exception as e:
+        print(f"  ! 지난 기획안을 읽지 못했습니다: {e}")
+
     # 2) 실제 게시물 성과를 직접 봅니다.
     since = dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=args.days)
     account = feed.fetch_account(business_id, token)
@@ -112,6 +135,12 @@ def main() -> int:
     }
     if analysis:
         payload["피드_분석가_리포트"] = analysis
+
+    if previous:
+        payload["지난_기획안"] = previous
+        since_plan = [m for m in media if previous_at and m["_when"] > previous_at]
+        payload["지난_기획안_이후_올라간_게시물"] = [brief(m, 400) for m in since_plan] or "없음"
+        print(f"지난 기획안 이후 게시물 {len(since_plan)}건")
 
     client = Anthropic()
     resp = client.messages.create(

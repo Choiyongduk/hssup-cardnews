@@ -1,14 +1,16 @@
 name: Feed Analysis
 
-# 주기 실행은 메인 계정(h_ssup_)을 연결하고 게시가 재개된 뒤에 붙입니다.
-# 지금 주간으로 돌리면 "게시물 없음" 리포트만 반복됩니다.
+# 월요일 아침에 분석 → 직원 리포트(09:20) → 기획(09:40) 순서로 이어집니다.
+# 기획자가 그 주의 최신 분석을 읽어야 제안이 최신 데이터에 근거하게 됩니다.
 on:
+  schedule:
+    - cron: "0 0 * * 1"  # 매주 월요일 09:00 KST
   workflow_dispatch:
     inputs:
       channel:
         description: 분석할 채널 slug
-        required: true
-        default: hssup-academy
+        required: false
+        default: hssup-main
       days:
         description: 분석 기간(일)
         required: false
@@ -43,10 +45,10 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           ARTMAKE_BOT_TOKEN: ${{ secrets.ARTMAKE_BOT_TOKEN }}
           PREPPY_POP_BOT_TOKEN: ${{ secrets.PREPPY_POP_BOT_TOKEN }}
-        run: python analyze_feed.py --channel "${{ inputs.channel }}" --days "${{ inputs.days }}"
+        run: python analyze_feed.py --channel "${{ inputs.channel || 'hssup-main' }}" --days "${{ inputs.days || '90' }}"
 
       - name: Upload report
         uses: actions/upload-artifact@v4
         with:
-          name: feed-analysis-${{ inputs.channel }}
+          name: feed-analysis-${{ inputs.channel || 'hssup-main' }}
           path: output/analysis/
