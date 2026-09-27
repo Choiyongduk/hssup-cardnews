@@ -16,7 +16,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install dependencies
-        run: pip install anthropic requests python-dotenv
+        run: pip install anthropic requests python-dotenv pyyaml
 
       - name: Answer pending feedback
         env:
