@@ -225,14 +225,14 @@ def main() -> int:
     # 앱의 AI OFFICE 탭에서 읽을 수 있도록 올립니다. 실패해도 리포트 전송은 계속합니다.
     try:
         names = ", ".join(e["name"] for e in entries)
-        trends_sync.create_report(
+        result = trends_sync.create_report(
             kind="staff",
             target=names,
             title=f"직원 계정 분석 ({today})",
             body=report,
             period_days=args.days,
         )
-        print("앱에 리포트 등록 완료")
+        print("앱의 오늘 리포트를 갱신했습니다" if result == "updated" else "앱에 리포트 등록 완료")
     except Exception as e:
         print(f"  ! 앱 리포트 등록 실패: {e}")
 

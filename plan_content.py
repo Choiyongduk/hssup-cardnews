@@ -172,14 +172,14 @@ def main() -> int:
     print(f"기획안 저장: {out_path}")
 
     try:
-        trends_sync.create_report(
+        result = trends_sync.create_report(
             kind="plan",
             target=args.channel,
             title=f"콘텐츠 기획안 {args.count}개 ({today})",
             body=plan,
             period_days=args.days,
         )
-        print("앱에 기획안 등록 완료")
+        print("앱의 오늘 기획안을 갱신했습니다" if result == "updated" else "앱에 기획안 등록 완료")
     except Exception as e:
         print(f"  ! 앱 등록 실패: {e}")
 

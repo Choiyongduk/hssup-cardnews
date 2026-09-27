@@ -8,9 +8,12 @@
 민감한 권한이므로 이 모듈 밖에서는 절대 이 키를 로그나 출력에 남기지 않습니다."""
 from __future__ import annotations
 
+import datetime as dt
 import os
 
 import requests
+
+KST = dt.timezone(dt.timedelta(hours=9))
 
 
 def _post(table: str, payload: dict) -> None:
@@ -229,12 +232,37 @@ def fetch_latest_report(kind: str) -> dict | None:
     return rows[0] if rows else None
 
 
-def create_report(kind: str, title: str, body: str, target: str | None = None, period_days: int | None = None) -> None:
-    """분석 리포트를 앱의 AI OFFICE 탭에서 볼 수 있도록 저장합니다."""
+def create_report(kind: str, title: str, body: str, target: str | None = None, period_days: int | None = None) -> str:
+    """분석 리포트를 앱의 AI OFFICE 탭에서 볼 수 있도록 저장합니다.
+
+    같은 날 같은 종류의 리포트가 이미 있으면 새로 만들지 않고 덮어씁니다.
+    하루에 여러 번 돌릴 때마다 쌓이면 무엇이 최신인지 알 수 없게 됩니다.
+    반환: "created" 또는 "updated"
+    """
+    today = dt.datetime.now(KST).strftime("%Y-%m-%d")
+    params = {
+        "select": "id,created_at",
+        "kind": f"eq.{kind}",
+        "order": "created_at.desc",
+        "limit": "5",
+    }
+    if target:
+        params["target"] = f"eq.{target}"
+
+    try:
+        for row in _get("ai_reports", params):
+            when = dt.datetime.fromisoformat(row["created_at"].replace("Z", "+00:00"))
+            if when.astimezone(KST).strftime("%Y-%m-%d") == today:
+                update_report(row["id"], body)
+                return "updated"
+    except Exception as e:
+        print(f"  ! 기존 리포트 확인 실패, 새로 만듭니다: {e}")
+
     _post(
         "ai_reports",
         {"kind": kind, "target": target, "title": title, "body": body, "period_days": period_days},
     )
+    return "created"
 
 
 def create_trend(
