@@ -15,7 +15,7 @@ from urllib.parse import urlparse
 import requests
 import yaml
 
-from engine import assets, media_caption, telegram
+from engine import assets, media_caption, telegram, trends_sync
 from engine.config import ROOT
 from engine.overlay import render_overlay
 from engine.video_overlay import extract_frame, render_video_overlay
@@ -83,6 +83,18 @@ def _process_one(cfg: dict, token: str, chat_id: str, entry_path: Path) -> None:
 
     telegram.create_pending(slug, date_key, media_urls, caption, source_message_id=entry.get("message_id"))
     telegram.send_preview(token, chat_id, post_paths, caption, slug, date_key)
+    # 앱에서도 승인할 수 있게 같은 건을 올립니다. 앱 쪽이 검증되면 텔레그램을 걷어냅니다.
+    try:
+        trends_sync.create_approval(
+            kind="post",
+            channel=slug,
+            ref_key=date_key,
+            title=f"{cfg['name']} 게시 승인",
+            body=caption,
+            image_urls=media_urls,
+        )
+    except Exception as e:
+        print(f"  ! [{slug}] 앱 승인 등록 실패: {e}")
     entry_path.unlink()
     print(f"  - [{slug}] {date_key} 미리보기 전송 완료, 대기열에서 제거")
 

@@ -39,6 +39,8 @@ jobs:
           PREPPY_POP_IG_BUSINESS_ID: ${{ secrets.PREPPY_POP_IG_BUSINESS_ID }}
           PREPPY_POP_IG_TOKEN: ${{ secrets.PREPPY_POP_IG_TOKEN }}
           HSSUP_ACADEMY_BOT_TOKEN: ${{ secrets.HSSUP_ACADEMY_BOT_TOKEN }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           ARTMAKE_BOT_TOKEN: ${{ secrets.ARTMAKE_BOT_TOKEN }}
           PREPPY_POP_BOT_TOKEN: ${{ secrets.PREPPY_POP_BOT_TOKEN }}
         run: python analyze_feed.py --channel "${{ inputs.channel }}" --days "${{ inputs.days }}"

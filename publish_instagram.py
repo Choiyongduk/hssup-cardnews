@@ -9,7 +9,7 @@ import json
 import os
 import sys
 
-from engine import instagram
+from engine import instagram, trends_sync
 from engine.config import ROOT, load_channel
 
 
@@ -85,7 +85,51 @@ def _publish_one(slug: str, date: str, entry_path, data: dict) -> None:
             print(f"  ! {slug}: 앱 트렌드 속보 등록 실패(인스타 게시는 정상 완료됨): {e}")
 
 
+def _apply_app_decisions() -> dict[tuple[str, str], int]:
+    """앱(AI 오피스)에서 내린 결정을 pending 파일에 반영합니다.
+
+    게시 자체는 아래 기존 흐름이 그대로 처리하고, 여기서는 상태만 맞춰줍니다.
+    반환: 게시까지 지켜봐야 할 {(slug, date): 승인행 id}
+    """
+    try:
+        rows = trends_sync.fetch_decided_approvals(kind="post")
+    except Exception as e:
+        print(f"  ! 앱 승인 목록 조회 실패: {e}")
+        return {}
+
+    watching: dict[tuple[str, str], int] = {}
+    for row in rows:
+        slug, date = row["channel"], row["ref_key"]
+        entry_path = ROOT / "pending" / slug / f"{date}.json"
+        if not entry_path.exists():
+            trends_sync.update_approval(row["id"], "failed", "대기 기록을 찾을 수 없습니다")
+            continue
+
+        data = json.loads(entry_path.read_text(encoding="utf-8"))
+        if data.get("status") not in ("awaiting_approval", "approved", "skipped"):
+            # 이미 게시됐거나 실패한 건은 건드리지 않습니다.
+            trends_sync.update_approval(row["id"], data.get("status") or "failed")
+            continue
+
+        if row["status"] == "skipped":
+            _write_status(entry_path, "skipped")
+            trends_sync.update_approval(row["id"], "skipped")
+            continue
+
+        # 원장이 앱에서 캡션을 고쳤으면 그 내용으로 게시합니다.
+        edited = row.get("body")
+        if edited and edited != data.get("caption"):
+            _write_status(entry_path, "approved", caption=edited)
+        else:
+            _write_status(entry_path, "approved")
+        watching[(slug, date)] = row["id"]
+
+    return watching
+
+
 def main() -> int:
+    watching = _apply_app_decisions()
+
     pending_dir = ROOT / "pending"
     if not pending_dir.exists():
         print("게시 대기 중인 항목이 없습니다.")
@@ -101,6 +145,14 @@ def main() -> int:
         print(f"[{slug}] {date} 게시 시작")
         _publish_one(slug, date, entry_path, data)
         count += 1
+
+        row_id = watching.get((slug, date))
+        if row_id:
+            result = json.loads(entry_path.read_text(encoding="utf-8"))
+            published = result.get("status") == "published"
+            trends_sync.update_approval(
+                row_id, "sent" if published else "failed", None if published else result.get("error")
+            )
 
     if count == 0:
         print("게시 대기 중인 항목이 없습니다.")

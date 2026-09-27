@@ -15,7 +15,7 @@ import sys
 
 from anthropic import Anthropic
 
-from engine import feed, telegram
+from engine import feed, telegram, trends_sync
 from engine.config import ROOT, load_channel
 
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -131,6 +131,19 @@ def main() -> int:
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(report, encoding="utf-8")
     print(f"리포트 저장: {out_path}")
+
+    # 앱의 AI OFFICE 탭에서 읽을 수 있도록 올립니다. 실패해도 리포트 전송은 계속합니다.
+    try:
+        trends_sync.create_report(
+            kind="feed",
+            target=args.channel,
+            title=f"{cfg['name']} 피드 분석 ({today})",
+            body=report,
+            period_days=args.days,
+        )
+        print("앱에 리포트 등록 완료")
+    except Exception as e:
+        print(f"  ! 앱 리포트 등록 실패: {e}")
 
     tg_cfg = cfg.get("telegram")
     if tg_cfg:

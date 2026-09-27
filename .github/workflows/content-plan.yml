@@ -1,0 +1,36 @@
+name: Content Plan
+
+# 기획 직원. 피드 분석가가 리포트를 낸 뒤에 돌아야 그 내용을 읽을 수 있으므로,
+# 직원 분석(09:20)보다 늦은 시간에 둡니다.
+on:
+  schedule:
+    - cron: "40 0 * * 1"  # 매주 월요일 09:40 KST
+  workflow_dispatch:
+    inputs:
+      count:
+        description: 기획안 개수
+        required: false
+        default: "3"
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Plan next content
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          HSSUP_MAIN_IG_BUSINESS_ID: ${{ secrets.HSSUP_MAIN_IG_BUSINESS_ID }}
+          HSSUP_MAIN_IG_TOKEN: ${{ secrets.HSSUP_MAIN_IG_TOKEN }}
+          HSSUP_ACADEMY_BOT_TOKEN: ${{ secrets.HSSUP_ACADEMY_BOT_TOKEN }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: python plan_content.py --channel hssup-main --count "${{ inputs.count || '3' }}"

@@ -1,0 +1,26 @@
+name: Answer Owner
+
+# 원장이 AI 오피스에서 남긴 피드백에 담당 직원이 답합니다.
+# 대화가 오가는 흐름이라 자주 돌아야 합니다 — cron-job.org가 1~2분마다 호출합니다.
+on:
+  workflow_dispatch:
+
+jobs:
+  answer:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install anthropic requests python-dotenv
+
+      - name: Answer pending feedback
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: python answer_owner.py

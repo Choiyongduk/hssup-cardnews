@@ -9,6 +9,8 @@ from pathlib import Path
 from anthropic import Anthropic
 from PIL import Image
 
+from .voice import HSSUP_VOICE
+
 DEFAULT_MODEL = "claude-sonnet-5"
 MAX_EDGE = 1568  # Claude 권장 최대 변 길이 (그 이상은 어차피 다운스케일됨)
 
@@ -29,9 +31,10 @@ SYSTEM_TEMPLATE = """당신은 {topic} 인스타그램 계정의 캡션·이미�
 - 사용자가 보낸 설명에 없는 사실을 지어내지 마세요.
 - 효과를 보장하거나 과장하는 표현, 의료 효과를 단정하는 표현은 쓰지 마세요.
 - 한자를 쓰지 마세요. 가운뎃점(·)으로 단어를 나열하는 상투적인 문구도 쓰지 마세요.
-- 캡션은 존댓말, 친근하면서도 전문적인 톤으로 작성하세요. 이모지는 과하지 않게 1~3개만 사용하세요.
 - 캡션에 해시태그는 쓰지 마세요. 채널 고정 해시태그가 캡션 뒤에 자동으로 붙습니다.
-- 헤드라인은 사진 위에 큰 글씨로 얹을 짧은 문구입니다. 2~6단어(한글 기준 12자 내외), 시술명·상품명·핵심 포인트를 화보 캡션처럼 임팩트 있게 뽑으세요 (예: "4H 리커버브로우", "탠저린 컬러 팝"). 완전한 문장이나 존댓말체로 쓰지 마세요."""
+- 헤드라인은 사진 위에 큰 글씨로 얹을 짧은 문구입니다. 2~6단어(한글 기준 12자 내외), 시술명·상품명·핵심 포인트를 화보 캡션처럼 임팩트 있게 뽑으세요 (예: "4H 리커버브로우", "탠저린 컬러 팝"). 완전한 문장이나 존댓말체로 쓰지 마세요. 헤드라인에는 아래 말투를 적용하지 않습니다.
+
+{voice}"""
 
 
 def write_post(
@@ -57,7 +60,7 @@ def write_post(
     resp = client.messages.create(
         model=model or os.environ.get("CLAUDE_MODEL", DEFAULT_MODEL),
         max_tokens=1024,
-        system=SYSTEM_TEMPLATE.format(topic=topic),
+        system=SYSTEM_TEMPLATE.format(topic=topic, voice=HSSUP_VOICE),
         tools=[
             {
                 "name": "write_post",

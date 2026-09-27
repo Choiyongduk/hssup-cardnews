@@ -32,6 +32,8 @@ jobs:
           HSSUP_MAIN_IG_BUSINESS_ID: ${{ secrets.HSSUP_MAIN_IG_BUSINESS_ID }}
           HSSUP_MAIN_IG_TOKEN: ${{ secrets.HSSUP_MAIN_IG_TOKEN }}
           HSSUP_ACADEMY_BOT_TOKEN: ${{ secrets.HSSUP_ACADEMY_BOT_TOKEN }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: python analyze_staff.py --days "${{ inputs.days || '28' }}"
 
       - name: Commit follower history
