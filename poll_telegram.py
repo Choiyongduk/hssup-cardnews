@@ -20,8 +20,34 @@ IMAGE_EXTS = {".jpg", ".jpeg", ".png"}
 VIDEO_EXTS = {".mp4", ".mov"}
 
 
+def _append_caption(cfg: dict, token: str, chat_id: str, text: str) -> None:
+    """사진을 보낸 뒤 설명을 따로 보낸 경우, 가장 최근 대기 항목에 이어 붙입니다.
+    사진과 설명을 한 번에 보내야만 반영되는 건 실제로 잘 지켜지지 않습니다."""
+    slug = cfg["slug"]
+    queue_dir = ROOT / "queue" / slug
+    entries = sorted(queue_dir.glob("*.json")) if queue_dir.exists() else []
+    if not entries:
+        telegram.notify(
+            token, chat_id,
+            f"⚠️ [{cfg['name']}] 사진이나 영상을 먼저 보내주세요. 설명만으로는 만들 수 없어요.",
+        )
+        print(f"  ! [{slug}] 붙일 대기 항목이 없어 설명을 건너뜁니다")
+        return
+
+    entry_path = entries[-1]
+    data = json.loads(entry_path.read_text(encoding="utf-8"))
+    data["user_caption"] = "\n".join(filter(None, [data.get("user_caption"), text]))
+    entry_path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    telegram.notify(token, chat_id, f"📝 [{cfg['name']}] 설명을 방금 보내신 사진에 반영했어요.")
+    print(f"  - [{slug}] 설명을 {entry_path.name}에 붙였습니다")
+
+
 def _enqueue_inbox_item(cfg: dict, token: str, chat_id: str, item: dict) -> None:
     slug = cfg["slug"]
+    if not item["paths"]:
+        _append_caption(cfg, token, chat_id, item["caption"])
+        return
+
     media_path = item["paths"][0]
     ext = media_path.suffix.lower()
 

@@ -174,6 +174,40 @@ def mark_answered(message_id: int) -> None:
         raise RuntimeError(f"메시지 상태 갱신 실패: {resp.status_code} {resp.text}")
 
 
+def fetch_requests(urgency: str | None = None) -> list[dict]:
+    """원장이 올린 콘텐츠 요청 중 아직 처리하지 않은 것."""
+    params = {"select": "*", "status": "eq.open", "order": "created_at.asc"}
+    if urgency:
+        params["urgency"] = f"eq.{urgency}"
+    try:
+        return _get("ai_requests", params)
+    except Exception as e:
+        print(f"  ! 콘텐츠 요청 조회 실패: {e}")
+        return []
+
+
+def close_requests(ids: list[int]) -> None:
+    """처리 끝난 요청에 표시합니다."""
+    if not ids:
+        return
+    url = os.environ.get("SUPABASE_URL")
+    key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+    resp = requests.patch(
+        f"{url}/rest/v1/ai_requests",
+        headers={
+            "apikey": key,
+            "Authorization": f"Bearer {key}",
+            "Content-Type": "application/json",
+            "Prefer": "return=minimal",
+        },
+        params={"id": f"in.({','.join(str(i) for i in ids)})"},
+        json={"status": "done", "done_at": dt.datetime.now(dt.timezone.utc).isoformat()},
+        timeout=30,
+    )
+    if resp.status_code not in (200, 204):
+        raise RuntimeError(f"요청 상태 갱신 실패: {resp.status_code} {resp.text}")
+
+
 def fetch_context(key: str = "business") -> str:
     """원장이 앱에 적어둔 사업 상황 메모. 숫자로는 알 수 없는 사정이 여기 들어옵니다."""
     try:

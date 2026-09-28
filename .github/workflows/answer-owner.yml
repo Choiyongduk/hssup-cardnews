@@ -1,7 +1,8 @@
 name: Answer Owner
 
-# 원장이 AI 오피스에서 남긴 피드백에 담당 직원이 답합니다.
-# 대화가 오가는 흐름이라 자주 돌아야 합니다 — cron-job.org가 1~2분마다 호출합니다.
+# 원장이 AI 오피스에서 남긴 피드백에 답하고, "지금" 으로 올린 콘텐츠 요청을 처리합니다.
+# 둘 다 사람이 기다리는 일이라 자주 돌아야 합니다 — cron-job.org가 1~2분마다 호출합니다.
+# (작업 큐를 따로 만들지 않고 이미 자주 도는 이 워크플로에 얹었습니다.)
 on:
   workflow_dispatch:
 
@@ -24,3 +25,13 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: python answer_owner.py
+
+      - name: Handle urgent content requests
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          HSSUP_MAIN_IG_BUSINESS_ID: ${{ secrets.HSSUP_MAIN_IG_BUSINESS_ID }}
+          HSSUP_MAIN_IG_TOKEN: ${{ secrets.HSSUP_MAIN_IG_TOKEN }}
+          HSSUP_ACADEMY_BOT_TOKEN: ${{ secrets.HSSUP_ACADEMY_BOT_TOKEN }}
+        run: python run_requests.py --channel hssup-main

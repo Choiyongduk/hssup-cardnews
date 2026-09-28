@@ -210,6 +210,11 @@ def poll(token: str, bot_name: str, inbox_chat_id: str | None = None) -> dict:
             if document and not (doc_mime.startswith("image/") or doc_mime.startswith("video/")):
                 document = None
             if not photos and not video and not document:
+                # 사진을 먼저 보내고 설명을 따로 보내는 일이 잦습니다.
+                # 그냥 버리면 설명이 사라지므로, 미디어 없는 메시지로 올려보냅니다.
+                text = (msg.get("text") or "").strip()
+                if text:
+                    inbox.append({"paths": [], "caption": text, "message_id": msg["message_id"]})
                 continue
             dest_dir = ROOT / "state" / "inbox" / bot_name / str(u["update_id"])
             paths = []

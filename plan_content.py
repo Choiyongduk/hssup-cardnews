@@ -38,6 +38,11 @@ SYSTEM = """당신은 {name} 인스타그램 계정의 콘텐츠 기획자입니
 - 명사 3개 이상을 가운뎃점(·)으로 나열하지 마세요.
 - 한자를 쓰지 마세요.
 
+"원장님_요청" 이 있으면 **그 요청부터 기획안으로 만드세요.** 원장님이 직접 올린 아이디어입니다.
+- 요청 하나당 기획 하나를 배정하고, 남는 자리를 데이터 기반 제안으로 채우세요.
+- 요청이 {count}개보다 많으면 전부 다루되, 기획 개수가 늘어나는 건 괜찮습니다.
+- 요청 내용이 성과 데이터와 어긋나도 만들어 주세요. 대신 근거에 무엇이 우려되는지 한 줄 적으세요.
+
 "사업 상황" 이 주어지면 **그것부터 읽고 시작하세요.** 원장님이 직접 적어둔, 숫자로는 알 수 없는 사정입니다.
 - 거기 적힌 일정이나 목표에 맞는 콘텐츠를 우선 제안하세요.
 - 다만 무조건 따르지 말고 경중을 따지세요. 성과 데이터와 어긋나면 어떻게 절충했는지 근거에 밝히세요.
@@ -144,6 +149,12 @@ def main() -> int:
         payload["사업_상황"] = business
         print(f"사업 상황 메모 참고 ({len(business)}자)")
 
+    # 원장님이 "주간"으로 올려둔 콘텐츠 요청을 이번 기획에 반영합니다.
+    pending = trends_sync.fetch_requests(urgency="weekly")
+    if pending:
+        payload["원장님_요청"] = [r["body"] for r in pending]
+        print(f"원장님 요청 {len(pending)}건 반영")
+
     if analysis:
         payload["피드_분석가_리포트"] = analysis
 
@@ -180,6 +191,9 @@ def main() -> int:
             period_days=args.days,
         )
         print("앱의 오늘 기획안을 갱신했습니다" if result == "updated" else "앱에 기획안 등록 완료")
+        if pending:
+            trends_sync.close_requests([r["id"] for r in pending])
+            print(f"요청 {len(pending)}건 처리 완료로 표시")
     except Exception as e:
         print(f"  ! 앱 등록 실패: {e}")
 
