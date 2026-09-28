@@ -1,10 +1,16 @@
-"""사용법: python process_queue.py
+"""사용법: python process_queue.py [--urgent]
+
 channels/*.yaml의 telegram_inbox 채널마다 queue/<slug>/에서 가장 오래된 대기 항목 1개를 꺼내
 캡션·헤드라인 작성 → (설정된 경우) 브랜드 오버레이 렌더링(사진/영상 모두) → 업로드 → 승인 요청 전송까지 처리합니다.
 매일 정해진 시간(cron-job.org)에 실행되어 "하루 하나씩 순서대로 게시" 흐름을 만듭니다.
+
+--urgent 는 앱에서 "지금 바로" 로 올린 것만 골라 전부 처리합니다.
+원장님이 기다리고 있는 일이라 몇 분마다 호출됩니다. 급한 게 없으면 아무것도 하지 않습니다.
+급하게 처리해도 인스타에 바로 올라가지는 않습니다 — 승인 요청까지만 앞당깁니다.
 """
 from __future__ import annotations
 
+import argparse
 import datetime as dt
 import json
 import os
@@ -161,6 +167,7 @@ def _drain_app_queue() -> None:
                     "app_queue_id": head["id"],
                     "storage_paths": [r["storage_path"] for r in members],
                     "storage_path": head["storage_path"],
+                    "urgency": head.get("urgency") or "scheduled",
                     "queued_at": head["created_at"],
                 },
                 ensure_ascii=False,
@@ -177,7 +184,14 @@ def _drain_app_queue() -> None:
         print(f"  - [{slug}] 앱에서 올린 소재를 대기열로 옮김 ({count}, 묶음 {key})")
 
 
-def _process_channel(path) -> None:
+def _is_urgent(entry_path: Path) -> bool:
+    try:
+        return json.loads(entry_path.read_text(encoding="utf-8")).get("urgency") == "now"
+    except Exception:
+        return False
+
+
+def _process_channel(path, urgent_only: bool = False) -> None:
     cfg = yaml.safe_load(path.read_text(encoding="utf-8"))
     tg_cfg = cfg.get("telegram")
     is_inbox = (cfg.get("source") or {}).get("type") == "telegram_inbox"
@@ -192,6 +206,17 @@ def _process_channel(path) -> None:
 
     queue_dir = ROOT / "queue" / cfg["slug"]
     entries = sorted(queue_dir.glob("*.json")) if queue_dir.exists() else []
+
+    if urgent_only:
+        # 급한 건 기다리게 두지 않는다. 있는 만큼 다 처리한다.
+        urgent = [e for e in entries if _is_urgent(e)]
+        if not urgent:
+            print(f"  - [{cfg['slug']}] 급한 소재 없음")
+            return
+        for entry in urgent:
+            _process_one(cfg, token, chat_id, entry)
+        return
+
     if not entries:
         print(f"  - [{cfg['slug']}] 대기열 비어있음")
         return
@@ -205,10 +230,14 @@ def main() -> int:
         print("channels/ 폴더가 없습니다.")
         return 0
 
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--urgent", action="store_true", help='앱에서 "지금 바로" 로 올린 것만 처리')
+    args = parser.parse_args()
+
     _drain_app_queue()
 
     for path in sorted(channels_dir.glob("*.yaml")):
-        _process_channel(path)
+        _process_channel(path, urgent_only=args.urgent)
     return 0
 
 
