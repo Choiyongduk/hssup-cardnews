@@ -331,13 +331,31 @@ def close_requests(ids: list[int]) -> None:
         raise RuntimeError(f"요청 상태 갱신 실패: {resp.status_code} {resp.text}")
 
 
+NOTE_SEP = chr(10) * 2  # 메모 여러 장을 빈 줄 하나로 나눠 이어 붙인다
+
+
 def fetch_context(key: str = "business") -> str:
-    """원장이 앱에 적어둔 사업 상황 메모. 숫자로는 알 수 없는 사정이 여기 들어옵니다."""
+    """원장이 앱에 적어둔 사업 상황 메모. 숫자로는 알 수 없는 사정이 여기 들어옵니다.
+
+    메모는 여러 장(ai_notes)으로 적습니다. 한 칸에 몰아 쓰던 시절의 것(ai_context)도
+    남아 있을 수 있어서 둘 다 읽어 합칩니다.
+    """
+    parts: list[str] = []
+    try:
+        for row in _get("ai_notes", {"select": "body", "key": f"eq.{key}", "order": "created_at.asc"}):
+            body = (row.get("body") or "").strip()
+            if body:
+                parts.append(body)
+    except Exception:
+        pass
     try:
         rows = _get("ai_context", {"select": "body", "key": f"eq.{key}"})
+        legacy = rows[0]["body"].strip() if rows else ""
+        if legacy:
+            parts.append(legacy)
     except Exception:
-        return ""
-    return (rows[0]["body"].strip() if rows else "")
+        pass
+    return NOTE_SEP.join(parts)
 
 
 def update_report(report_id: int, body: str) -> None:
