@@ -62,7 +62,8 @@ python refresh_ig_tokens.py      # 장기 토큰 갱신 (FB_APP_ID/SECRET 필요
 GitHub Actions의 `schedule` 트리거는 지연이 심함(몇 시간까지 밀린 적 있음, private 저장소일수록 심함).
 대신 **cron-job.org**(무료)가 GitHub API의 `workflow_dispatch`를 직접 호출하도록 구성했음 — dispatch는
 거의 즉시 실행됨. 등록된 크론 잡: `hssup-telegram-poll`(1분마다), `hssup-instagram-publish`(2분마다),
-`hssup-process-queue`(매일 저녁 8시 KST). `schedule:`도 백업용으로 남겨뒀지만 실질적 트리거는 cron-job.org.
+`hssup-process-queue`(매일 낮 12:30·저녁 8시 KST), `hssup-revise-post`(수정 요청 처리), `hssup-process-now`(앱에서 "지금 바로"로 올린 소재).
+뒤의 둘은 사람이 기다리는 일이라 몇 분 간격 — 할 일이 없으면 값싼 확인만 하고 끝난다. `schedule:`도 백업용으로 남겨뒀지만 실질적 트리거는 cron-job.org.
 
 이 저장소(`hssup-cardnews`, `hssup-cardnews-assets`)는 **public**으로 전환됨 — GitHub Actions 무료 분량
 (월 2,000분)은 private 저장소에만 적용되고 public은 무제한이라, 1~2분 간격 폴링을 계속 쓰려면 필수였음.
@@ -108,4 +109,5 @@ Windows, PowerShell, VS Code, Python 3. 가상환경 `.venv` 사용 (설치 완�
 - [x] GitHub Actions 스케줄 지연 문제 해결 (cron-job.org 외부 트리거 + 저장소 public 전환)
 - [ ] 실전 테스트: 세 채널 모두 대기열 → 자동 게시까지 한 바퀴 확인
 - [ ] 프루피팝 인스타그램 계정명 실제로 변경(preppypop_official → 확정 이름) 후 channels/preppy-pop.yaml 갱신
-- [ ] (다음 단계) 영상 지원, 앨범(여러 장) 지원, DM 자동 응대(수강 문의/시술 문의), 반영구 업계 최신정보 자동 업데이트
+- [x] 앱에서 사진 여러 장을 한 게시물(캐러셀)로 올리기 + "지금 바로" 즉시 처리
+- [ ] (다음 단계) 영상 지원, DM 자동 응대(수강 문의/시술 문의), 반영구 업계 최신정보 자동 업데이트
