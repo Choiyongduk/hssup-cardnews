@@ -174,6 +174,50 @@ def mark_answered(message_id: int) -> None:
         raise RuntimeError(f"메시지 상태 갱신 실패: {resp.status_code} {resp.text}")
 
 
+def fetch_media_queue() -> list[dict]:
+    """앱에서 올린 사진·영상 중 아직 처리하지 않은 것 (오래된 순)."""
+    try:
+        return _get(
+            "ai_media_queue",
+            {"select": "*", "status": "eq.queued", "order": "created_at.asc"},
+        )
+    except Exception as e:
+        print(f"  ! 앱 대기열 조회 실패: {e}")
+        return []
+
+
+def update_media_queue(row_id: int, status: str, error: str | None = None) -> None:
+    url = os.environ.get("SUPABASE_URL")
+    key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+    resp = requests.patch(
+        f"{url}/rest/v1/ai_media_queue",
+        headers={
+            "apikey": key,
+            "Authorization": f"Bearer {key}",
+            "Content-Type": "application/json",
+            "Prefer": "return=minimal",
+        },
+        params={"id": f"eq.{row_id}"},
+        json={"status": status, "error": error, "done_at": dt.datetime.now(dt.timezone.utc).isoformat()},
+        timeout=30,
+    )
+    if resp.status_code not in (200, 204):
+        raise RuntimeError(f"앱 대기열 갱신 실패: {resp.status_code} {resp.text}")
+
+
+def delete_storage_object(bucket: str, path: str) -> None:
+    """게시가 끝난 원본을 지웁니다. 남겨두면 용량이 계속 쌓입니다."""
+    url = os.environ.get("SUPABASE_URL")
+    key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+    resp = requests.delete(
+        f"{url}/storage/v1/object/{bucket}/{path}",
+        headers={"apikey": key, "Authorization": f"Bearer {key}"},
+        timeout=30,
+    )
+    if resp.status_code not in (200, 204, 404):
+        raise RuntimeError(f"원본 삭제 실패: {resp.status_code} {resp.text}")
+
+
 def fetch_requests(urgency: str | None = None) -> list[dict]:
     """원장이 올린 콘텐츠 요청 중 아직 처리하지 않은 것."""
     params = {"select": "*", "status": "eq.open", "order": "created_at.asc"}

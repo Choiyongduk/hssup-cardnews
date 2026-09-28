@@ -34,6 +34,8 @@ jobs:
           ARTMAKE_BOT_TOKEN: ${{ secrets.ARTMAKE_BOT_TOKEN }}
           ASSETS_REPO: ${{ secrets.ASSETS_REPO }}
           ASSETS_REPO_TOKEN: ${{ secrets.ASSETS_REPO_TOKEN }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: python process_queue.py
 
       - name: Commit queue/pending/state updates

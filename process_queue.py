@@ -95,8 +95,56 @@ def _process_one(cfg: dict, token: str, chat_id: str, entry_path: Path) -> None:
         )
     except Exception as e:
         print(f"  ! [{slug}] 앱 승인 등록 실패: {e}")
+
+    # 오버레이를 입힌 결과물이 에셋 저장소에 올라갔으므로 원본은 더 필요 없습니다.
+    if entry.get("storage_path"):
+        try:
+            trends_sync.delete_storage_object("content-media", entry["storage_path"])
+            print(f"  - [{slug}] 앱에 올린 원본 삭제")
+        except Exception as e:
+            print(f"  ! [{slug}] 원본 삭제 실패(게시에는 지장 없음): {e}")
+
     entry_path.unlink()
     print(f"  - [{slug}] {date_key} 미리보기 전송 완료, 대기열에서 제거")
+
+
+def _drain_app_queue() -> None:
+    """앱에서 올린 소재를 파일 대기열로 옮깁니다.
+
+    여기서 형식을 맞춰두면 텔레그램으로 온 것과 똑같이 처리됩니다.
+    Supabase 원본은 오버레이를 입혀 에셋 저장소에 올린 뒤 지웁니다 — 남겨두면 용량만 찹니다.
+    """
+    rows = trends_sync.fetch_media_queue()
+    if not rows:
+        return
+
+    for row in rows:
+        slug = row["channel"]
+        queue_dir = ROOT / "queue" / slug
+        queue_dir.mkdir(parents=True, exist_ok=True)
+        ts = dt.datetime.now(dt.timezone.utc).strftime("%Y%m%d-%H%M%S")
+        entry_path = queue_dir / f"{ts}-app{row['id']}.json"
+        entry_path.write_text(
+            json.dumps(
+                {
+                    "media_url": row["media_url"],
+                    "media_type": row["media_type"],
+                    "user_caption": row.get("user_caption") or "",
+                    "message_id": f"app{row['id']}",
+                    "app_queue_id": row["id"],
+                    "storage_path": row["storage_path"],
+                    "queued_at": row["created_at"],
+                },
+                ensure_ascii=False,
+                indent=2,
+            ),
+            encoding="utf-8",
+        )
+        try:
+            trends_sync.update_media_queue(row["id"], "done")
+        except Exception as e:
+            print(f"  ! 앱 대기열 상태 갱신 실패(id {row['id']}): {e}")
+        print(f"  - [{slug}] 앱에서 올린 소재를 대기열로 옮김 (id {row['id']})")
 
 
 def _process_channel(path) -> None:
@@ -126,6 +174,9 @@ def main() -> int:
     if not channels_dir.exists():
         print("channels/ 폴더가 없습니다.")
         return 0
+
+    _drain_app_queue()
+
     for path in sorted(channels_dir.glob("*.yaml")):
         _process_channel(path)
     return 0
