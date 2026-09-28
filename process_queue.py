@@ -28,16 +28,23 @@ def _process_one(cfg: dict, token: str, chat_id: str, entry_path: Path) -> None:
     print(f"  - [{slug}] 대기열에서 꺼냄: {entry_path.name}")
 
     is_video = entry.get("media_type") == "video"
-    ext = Path(urlparse(entry["media_url"]).path).suffix or (".mp4" if is_video else ".jpg")
+    media_urls = entry.get("media_urls") or [entry["media_url"]]
 
     tmp_dir = ROOT / "state" / "queue_tmp"
     tmp_dir.mkdir(parents=True, exist_ok=True)
-    media_path = tmp_dir / f"{slug}-{date_key}{ext}"
 
     try:
-        resp = requests.get(entry["media_url"], timeout=30)
-        resp.raise_for_status()
-        media_path.write_bytes(resp.content)
+        # 여러 장이면 첫 장이 표지다. 캡션도 오버레이도 첫 장을 기준으로 한다.
+        media_paths = []
+        for i, url in enumerate(media_urls[:10]):  # 인스타 캐러셀 최대 10장
+            ext = Path(urlparse(url).path).suffix or (".mp4" if is_video else ".jpg")
+            suffix = "" if i == 0 else f"-{i}"
+            dest = tmp_dir / f"{slug}-{date_key}{suffix}{ext}"
+            resp = requests.get(url, timeout=30)
+            resp.raise_for_status()
+            dest.write_bytes(resp.content)
+            media_paths.append(dest)
+        media_path = media_paths[0]
 
         caption_source_path = media_path
         if is_video:
@@ -48,7 +55,7 @@ def _process_one(cfg: dict, token: str, chat_id: str, entry_path: Path) -> None:
         )
         caption = post["caption"]
 
-        post_paths = [media_path]
+        post_paths = list(media_paths)
         overlay_cfg = cfg.get("overlay")
         if overlay_cfg:
             if is_video:
@@ -70,9 +77,10 @@ def _process_one(cfg: dict, token: str, chat_id: str, entry_path: Path) -> None:
                     logo_text=overlay_cfg.get("logo_text"),
                     brand_color=overlay_cfg.get("brand_color", "#fa5500"),
                 )
-            post_paths = [rendered]
+            # 표지에만 헤드라인을 얹는다. 뒷장은 원본 그대로 넘어간다.
+            post_paths = [rendered] + media_paths[1:]
 
-        media_urls = assets.upload_images(post_paths, slug, date_key)
+        post_urls = assets.upload_images(post_paths, slug, date_key)
     except Exception as e:
         print(f"  ! [{slug}] 처리 실패: {e}")
         try:
@@ -82,10 +90,12 @@ def _process_one(cfg: dict, token: str, chat_id: str, entry_path: Path) -> None:
         return
 
     telegram.create_pending(
-        slug, date_key, media_urls, caption,
+        slug, date_key, post_urls, caption,
         source_message_id=entry.get("message_id"),
         storage_path=entry.get("storage_path"),
+        storage_paths=entry.get("storage_paths"),
         source_url=entry.get("media_url"),
+        source_urls=media_urls,
     )
     telegram.send_preview(token, chat_id, post_paths, caption, slug, date_key)
     # 앱에서도 승인할 수 있게 같은 건을 올립니다. 앱 쪽이 검증되면 텔레그램을 걷어냅니다.
@@ -96,10 +106,12 @@ def _process_one(cfg: dict, token: str, chat_id: str, entry_path: Path) -> None:
             ref_key=date_key,
             title=f"{cfg['name']} 게시 승인",
             body=caption,
-            image_urls=media_urls,
+            image_urls=post_urls,
             payload={
                 "storage_path": entry.get("storage_path"),
+                "storage_paths": entry.get("storage_paths"),
                 "source_url": entry.get("media_url"),
+                "source_urls": media_urls,
                 "media_type": entry.get("media_type"),
             },
         )
@@ -120,33 +132,49 @@ def _drain_app_queue() -> None:
     if not rows:
         return
 
+    # 한 번에 고른 사진들은 같은 group_key 를 갖는다. 그런 것끼리 묶어 한 게시물로 만든다.
+    # group_key 가 없는 건 예전에 올린 것이라 id 를 묶음으로 친다.
+    groups: dict[str, list[dict]] = {}
     for row in rows:
-        slug = row["channel"]
+        groups.setdefault(row.get("group_key") or f"id{row['id']}", []).append(row)
+
+    for key, members in groups.items():
+        members.sort(key=lambda r: (r.get("sort_order") or 0, r["id"]))
+        head = members[0]
+        slug = head["channel"]
         queue_dir = ROOT / "queue" / slug
         queue_dir.mkdir(parents=True, exist_ok=True)
         ts = dt.datetime.now(dt.timezone.utc).strftime("%Y%m%d-%H%M%S")
-        entry_path = queue_dir / f"{ts}-app{row['id']}.json"
+        entry_path = queue_dir / f"{ts}-app{head['id']}.json"
+
+        # 설명은 아무 장에나 적을 수 있으니 처음 적힌 것을 쓴다.
+        caption = next((r.get("user_caption") for r in members if r.get("user_caption")), "")
+
         entry_path.write_text(
             json.dumps(
                 {
-                    "media_url": row["media_url"],
-                    "media_type": row["media_type"],
-                    "user_caption": row.get("user_caption") or "",
-                    "message_id": f"app{row['id']}",
-                    "app_queue_id": row["id"],
-                    "storage_path": row["storage_path"],
-                    "queued_at": row["created_at"],
+                    "media_urls": [r["media_url"] for r in members],
+                    "media_url": head["media_url"],  # 예전 형식과의 호환
+                    "media_type": head["media_type"],
+                    "user_caption": caption,
+                    "message_id": f"app{head['id']}",
+                    "app_queue_id": head["id"],
+                    "storage_paths": [r["storage_path"] for r in members],
+                    "storage_path": head["storage_path"],
+                    "queued_at": head["created_at"],
                 },
                 ensure_ascii=False,
                 indent=2,
             ),
             encoding="utf-8",
         )
-        try:
-            trends_sync.update_media_queue(row["id"], "done")
-        except Exception as e:
-            print(f"  ! 앱 대기열 상태 갱신 실패(id {row['id']}): {e}")
-        print(f"  - [{slug}] 앱에서 올린 소재를 대기열로 옮김 (id {row['id']})")
+        for row in members:
+            try:
+                trends_sync.update_media_queue(row["id"], "done")
+            except Exception as e:
+                print(f"  ! 앱 대기열 상태 갱신 실패(id {row['id']}): {e}")
+        count = f"{len(members)}장" if len(members) > 1 else "1건"
+        print(f"  - [{slug}] 앱에서 올린 소재를 대기열로 옮김 ({count}, 묶음 {key})")
 
 
 def _process_channel(path) -> None:

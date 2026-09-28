@@ -42,14 +42,15 @@ def _drop_original(slug: str, data: dict) -> None:
     게시하거나 건너뛰기 전까지는 남겨둡니다. 승인 전에 "이렇게 바꿔줘" 라고 하면
     오버레이를 다시 입혀야 하는데, 글자가 이미 박힌 결과물 위에 또 입힐 수는 없기 때문입니다.
     """
-    path = data.get("storage_path")
-    if not path:
+    paths = data.get("storage_paths") or ([data["storage_path"]] if data.get("storage_path") else [])
+    if not paths:
         return
-    try:
-        trends_sync.delete_storage_object("content-media", path)
-        print(f"  - {slug}: 앱에 올린 원본 삭제")
-    except Exception as e:
-        print(f"  ! {slug}: 원본 삭제 실패(게시에는 지장 없음): {e}")
+    for path in paths:
+        try:
+            trends_sync.delete_storage_object("content-media", path)
+        except Exception as e:
+            print(f"  ! {slug}: 원본 삭제 실패(게시에는 지장 없음): {e}")
+    print(f"  - {slug}: 앱에 올린 원본 {len(paths)}건 삭제")
 
 
 def _publish_one(slug: str, date: str, entry_path, data: dict) -> None:

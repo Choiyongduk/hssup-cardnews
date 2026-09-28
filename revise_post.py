@@ -69,10 +69,11 @@ TOOL = {
 def _rerender(row: dict, headline: str) -> list[str] | None:
     """원본을 내려받아 오버레이를 다시 입히고 에셋 저장소에 올립니다."""
     payload = row.get("payload") or {}
-    source_url = payload.get("source_url")
-    if not source_url:
+    source_urls = payload.get("source_urls") or ([payload["source_url"]] if payload.get("source_url") else [])
+    if not source_urls:
         print("  ! 원본 주소가 없어 그림을 다시 만들 수 없습니다")
         return None
+    source_url = source_urls[0]  # 글씨는 표지에만 얹혀 있다
 
     cfg = load_channel(row["channel"])
     overlay_cfg = cfg.get("overlay") or {}
@@ -110,7 +111,12 @@ def _rerender(row: dict, headline: str) -> list[str] | None:
                 brand_color=overlay_cfg.get("brand_color", "#fa5500"),
             )
 
-        return assets.upload_images([out], row["channel"], f"revised/{row['ref_key']}")
+        # 표지만 새로 올리고, 뒷장은 이미 올라가 있는 주소를 그대로 쓴다.
+        new_cover = assets.upload_images([out], row["channel"], f"revised/{row['ref_key']}")
+        if not new_cover:
+            return None
+        rest = (row.get("image_urls") or [])[1:]
+        return new_cover + rest
 
 
 def _sync_pending_file(row: dict, caption: str | None, image_urls: list[str] | None) -> None:
