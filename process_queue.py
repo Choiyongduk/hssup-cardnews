@@ -81,7 +81,12 @@ def _process_one(cfg: dict, token: str, chat_id: str, entry_path: Path) -> None:
             pass
         return
 
-    telegram.create_pending(slug, date_key, media_urls, caption, source_message_id=entry.get("message_id"))
+    telegram.create_pending(
+        slug, date_key, media_urls, caption,
+        source_message_id=entry.get("message_id"),
+        storage_path=entry.get("storage_path"),
+        source_url=entry.get("media_url"),
+    )
     telegram.send_preview(token, chat_id, post_paths, caption, slug, date_key)
     # 앱에서도 승인할 수 있게 같은 건을 올립니다. 앱 쪽이 검증되면 텔레그램을 걷어냅니다.
     try:
@@ -92,17 +97,14 @@ def _process_one(cfg: dict, token: str, chat_id: str, entry_path: Path) -> None:
             title=f"{cfg['name']} 게시 승인",
             body=caption,
             image_urls=media_urls,
+            payload={
+                "storage_path": entry.get("storage_path"),
+                "source_url": entry.get("media_url"),
+                "media_type": entry.get("media_type"),
+            },
         )
     except Exception as e:
         print(f"  ! [{slug}] 앱 승인 등록 실패: {e}")
-
-    # 오버레이를 입힌 결과물이 에셋 저장소에 올라갔으므로 원본은 더 필요 없습니다.
-    if entry.get("storage_path"):
-        try:
-            trends_sync.delete_storage_object("content-media", entry["storage_path"])
-            print(f"  - [{slug}] 앱에 올린 원본 삭제")
-        except Exception as e:
-            print(f"  ! [{slug}] 원본 삭제 실패(게시에는 지장 없음): {e}")
 
     entry_path.unlink()
     print(f"  - [{slug}] {date_key} 미리보기 전송 완료, 대기열에서 제거")

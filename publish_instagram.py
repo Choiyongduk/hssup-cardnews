@@ -36,6 +36,22 @@ def _write_status(path, status: str, **extra) -> None:
     path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
+def _drop_original(slug: str, data: dict) -> None:
+    """앱에서 올린 원본을 지웁니다.
+
+    게시하거나 건너뛰기 전까지는 남겨둡니다. 승인 전에 "이렇게 바꿔줘" 라고 하면
+    오버레이를 다시 입혀야 하는데, 글자가 이미 박힌 결과물 위에 또 입힐 수는 없기 때문입니다.
+    """
+    path = data.get("storage_path")
+    if not path:
+        return
+    try:
+        trends_sync.delete_storage_object("content-media", path)
+        print(f"  - {slug}: 앱에 올린 원본 삭제")
+    except Exception as e:
+        print(f"  ! {slug}: 원본 삭제 실패(게시에는 지장 없음): {e}")
+
+
 def _publish_one(slug: str, date: str, entry_path, data: dict) -> None:
     cfg = load_channel(slug)
     ig_cfg = cfg.get("instagram")
@@ -69,6 +85,7 @@ def _publish_one(slug: str, date: str, entry_path, data: dict) -> None:
 
     _write_status(entry_path, "published", media_id=media_id)
     _notify(cfg, f"✅ [{cfg['name']}] {date} 인스타그램 게시 완료 (media_id: {media_id})")
+    _drop_original(slug, data)
 
     if slug == "hssup-news":
         try:
@@ -113,6 +130,7 @@ def _apply_app_decisions() -> dict[tuple[str, str], int]:
 
         if row["status"] == "skipped":
             _write_status(entry_path, "skipped")
+            _drop_original(slug, data)
             trends_sync.update_approval(row["id"], "skipped")
             continue
 

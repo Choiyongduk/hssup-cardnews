@@ -1,0 +1,75 @@
+name: Revise Post
+
+# 승인 대기 게시물에 남긴 수정 요청을 처리합니다.
+# 사람이 기다리는 일이라 자주 돌아야 해서 cron-job.org가 몇 분마다 호출합니다.
+#
+# 그림을 다시 만들 때만 Playwright와 ffmpeg이 필요한데 설치가 느립니다.
+# 그래서 먼저 값싸게 "할 일이 있나"만 확인하고, 있을 때만 설치합니다.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  revise:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Check for pending revisions
+        id: check
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          pip install --quiet requests
+          python - <<'PY'
+          import os, requests
+          r = requests.get(
+              f"{os.environ['SUPABASE_URL']}/rest/v1/ai_approval_messages",
+              headers={
+                  "apikey": os.environ["SUPABASE_SERVICE_ROLE_KEY"],
+                  "Authorization": f"Bearer {os.environ['SUPABASE_SERVICE_ROLE_KEY']}",
+              },
+              params={"select": "id", "role": "eq.owner", "answered": "is.false", "limit": "1"},
+              timeout=30,
+          )
+          has_work = r.status_code == 200 and len(r.json()) > 0
+          with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+              f.write(f"has_work={'true' if has_work else 'false'}\n")
+          print("처리할 수정 요청", "있음" if has_work else "없음")
+          PY
+
+      - name: Install dependencies
+        if: steps.check.outputs.has_work == 'true'
+        run: |
+          pip install -r requirements.txt
+          playwright install --with-deps chromium
+          ffmpeg -version || sudo apt-get install -y ffmpeg
+
+      - name: Apply revisions
+        if: steps.check.outputs.has_work == 'true'
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          ASSETS_REPO: ${{ secrets.ASSETS_REPO }}
+          ASSETS_REPO_TOKEN: ${{ secrets.ASSETS_REPO_TOKEN }}
+          HSSUP_ACADEMY_BOT_TOKEN: ${{ secrets.HSSUP_ACADEMY_BOT_TOKEN }}
+          ARTMAKE_BOT_TOKEN: ${{ secrets.ARTMAKE_BOT_TOKEN }}
+        run: python revise_post.py
+
+      - name: Commit updated pending records
+        if: steps.check.outputs.has_work == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add pending/
+          git diff --cached --quiet || git commit -m "chore: apply post revisions [skip ci]"
+          git pull --rebase origin master
+          git push

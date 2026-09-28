@@ -174,6 +174,85 @@ def mark_answered(message_id: int) -> None:
         raise RuntimeError(f"메시지 상태 갱신 실패: {resp.status_code} {resp.text}")
 
 
+def fetch_unanswered_approval_messages() -> list[dict]:
+    """승인 대기 게시물에 원장이 남겼는데 아직 처리하지 않은 요청."""
+    try:
+        return _get(
+            "ai_approval_messages",
+            {
+                "select": "*,ai_approvals(id,channel,ref_key,body,image_urls,payload,status)",
+                "role": "eq.owner",
+                "answered": "is.false",
+                "order": "created_at.asc",
+                "limit": "5",
+            },
+        )
+    except Exception as e:
+        print(f"  ! 승인 대화 조회 실패: {e}")
+        return []
+
+
+def fetch_approval_thread(approval_id: int) -> list[dict]:
+    return _get(
+        "ai_approval_messages",
+        {"select": "role,body,created_at", "approval_id": f"eq.{approval_id}", "order": "created_at.asc"},
+    )
+
+
+def create_approval_message(approval_id: int, role: str, body: str) -> None:
+    _post(
+        "ai_approval_messages",
+        {"approval_id": approval_id, "role": role, "body": body, "answered": True},
+    )
+
+
+def mark_approval_message_answered(message_id: int) -> None:
+    url = os.environ.get("SUPABASE_URL")
+    key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+    resp = requests.patch(
+        f"{url}/rest/v1/ai_approval_messages",
+        headers={
+            "apikey": key,
+            "Authorization": f"Bearer {key}",
+            "Content-Type": "application/json",
+            "Prefer": "return=minimal",
+        },
+        params={"id": f"eq.{message_id}"},
+        json={"answered": True},
+        timeout=30,
+    )
+    if resp.status_code not in (200, 204):
+        raise RuntimeError(f"승인 대화 갱신 실패: {resp.status_code} {resp.text}")
+
+
+def update_approval_content(row_id: int, body: str | None = None, image_urls: list[str] | None = None) -> None:
+    """승인 대기 건의 캡션이나 이미지를 고쳐 씁니다."""
+    payload = {}
+    if body is not None:
+        payload["body"] = body
+    if image_urls is not None:
+        payload["image_urls"] = image_urls
+    if not payload:
+        return
+
+    url = os.environ.get("SUPABASE_URL")
+    key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+    resp = requests.patch(
+        f"{url}/rest/v1/ai_approvals",
+        headers={
+            "apikey": key,
+            "Authorization": f"Bearer {key}",
+            "Content-Type": "application/json",
+            "Prefer": "return=minimal",
+        },
+        params={"id": f"eq.{row_id}"},
+        json=payload,
+        timeout=30,
+    )
+    if resp.status_code not in (200, 204):
+        raise RuntimeError(f"승인 내용 갱신 실패: {resp.status_code} {resp.text}")
+
+
 def fetch_media_queue() -> list[dict]:
     """앱에서 올린 사진·영상 중 아직 처리하지 않은 것 (오래된 순)."""
     try:
