@@ -19,7 +19,10 @@ cardnews 프로젝트의 engine/sources.py를 그대로 이식한 RssSource를 �
 """
 from __future__ import annotations
 
+import json
 from abc import ABC, abstractmethod
+
+from engine.config import ROOT
 
 
 class Source(ABC):
@@ -98,8 +101,25 @@ class RssSource(Source):
         return data
 
 
+class JsonSource(Source):
+    """정해둔 JSON 파일을 그대로 읽습니다.
+
+    RSS 기사가 아니라 주제를 잡아 직접 쓴 카드뉴스에 씁니다.
+    (예: "해외에서 난리난 터지는 카드뉴스 비법" 같은 기획물)
+    파일 형식은 이 파일 맨 위 스키마와 같습니다.
+    """
+
+    def load(self) -> dict:
+        path = ROOT / self.cfg.get("path", "data/cards.json")
+        if not path.exists():
+            raise ValueError(f"카드 내용 파일이 없습니다: {path}")
+        with path.open(encoding="utf-8") as f:
+            return json.load(f)
+
+
 REGISTRY: dict[str, type[Source]] = {
     "rss": RssSource,
+    "json": JsonSource,
 }
 
 

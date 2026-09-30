@@ -67,6 +67,23 @@ def main() -> int:
             headline=data.get("headline"), one_liner=data.get("one_liner"),
         )
         print("  이미지 공개 업로드 + 승인 대기 레코드 생성 완료")
+
+        # 앱에서도 보고 승인할 수 있게 같은 건을 올립니다.
+        try:
+            from engine import trends_sync
+
+            trends_sync.create_approval(
+                kind="post",
+                channel=cfg["slug"],
+                ref_key=key,
+                title=f"{cfg['name']} 게시 승인",
+                body=caption,
+                image_urls=image_urls,
+                payload={"media_type": "carousel", "cards": len(pngs)},
+            )
+            print("  앱 승인 목록 등록 완료")
+        except Exception as e:
+            print(f"  ! 앱 승인 등록 실패: {e}")
     except ValueError as e:
         print(f"  ! 이미지 업로드 건너뜀: {e}")
 
