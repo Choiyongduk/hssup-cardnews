@@ -1,15 +1,21 @@
 name: Revise Post
 
 # 승인 대기 게시물에 남긴 수정 요청을 처리합니다.
-# 사람이 기다리는 일이라 자주 돌아야 해서 cron-job.org가 몇 분마다 호출합니다.
+# 원장님이 기다리는 일이라 cron-job.org가 1분마다 호출합니다.
 #
-# 그림을 다시 만들 때만 Playwright와 ffmpeg이 필요한데 설치가 느립니다.
-# 그래서 먼저 값싸게 "할 일이 있나"만 확인하고, 있을 때만 설치합니다.
+# 빠른 게 중요해서 무거운 설치를 최대한 피합니다.
+#  1) 값싸게 "할 일이 있나" 만 본다 (요청이 없으면 여기서 끝, 약 15초)
+#  2) 가벼운 도구만 깔고 판단한다 — 캡션만 고치면 되는 건 여기서 끝난다 (약 35초)
+#  3) 그림을 다시 만들어야 할 때만 Playwright/ffmpeg 를 깐다 (여기서 37초가 더 든다)
 on:
   workflow_dispatch:
 
 permissions:
   contents: write
+
+concurrency:
+  group: revise-post
+  cancel-in-progress: false
 
 jobs:
   revise:
@@ -20,6 +26,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: pip
 
       - name: Check for pending revisions
         id: check
@@ -45,15 +52,32 @@ jobs:
           print("처리할 수정 요청", "있음" if has_work else "없음")
           PY
 
-      - name: Install dependencies
+      # 캡션만 고치는 데 Playwright 는 필요 없다. 가벼운 것만 깐다.
+      - name: Install light dependencies
         if: steps.check.outputs.has_work == 'true'
+        run: pip install anthropic PyYAML python-dotenv requests
+
+      - name: Apply caption revisions
+        id: plan
+        if: steps.check.outputs.has_work == 'true'
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          HSSUP_ACADEMY_BOT_TOKEN: ${{ secrets.HSSUP_ACADEMY_BOT_TOKEN }}
+          ARTMAKE_BOT_TOKEN: ${{ secrets.ARTMAKE_BOT_TOKEN }}
+        run: python revise_post.py --plan-only
+
+      # 여기부터는 그림을 다시 만들어야 할 때만 돈다.
+      - name: Install render dependencies
+        if: steps.plan.outputs.needs_render == 'true'
         run: |
           pip install -r requirements.txt
           playwright install --with-deps chromium
-          ffmpeg -version || sudo apt-get install -y ffmpeg
+          ffmpeg -version || sudo apt-get update && sudo apt-get install -y ffmpeg
 
-      - name: Apply revisions
-        if: steps.check.outputs.has_work == 'true'
+      - name: Rebuild images
+        if: steps.plan.outputs.needs_render == 'true'
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
@@ -62,7 +86,7 @@ jobs:
           ASSETS_REPO_TOKEN: ${{ secrets.ASSETS_REPO_TOKEN }}
           HSSUP_ACADEMY_BOT_TOKEN: ${{ secrets.HSSUP_ACADEMY_BOT_TOKEN }}
           ARTMAKE_BOT_TOKEN: ${{ secrets.ARTMAKE_BOT_TOKEN }}
-        run: python revise_post.py
+        run: python revise_post.py --apply-plan
 
       - name: Commit updated pending records
         if: steps.check.outputs.has_work == 'true'

@@ -1,13 +1,24 @@
-"""사용법: python revise_post.py
+"""사용법: python revise_post.py [--plan-only | --apply-plan]
 
 승인 대기 중인 게시물에 원장님이 남긴 수정 요청을 처리합니다.
 
 - 캡션만 고치면 되는 요청은 글만 새로 씁니다.
 - 헤드라인이나 로고처럼 그림을 건드려야 하는 요청은 오버레이를 다시 입힙니다.
   이때 앱에 올린 원본이 필요해서, 게시하거나 건너뛰기 전까지 원본을 지우지 않습니다.
+
+원장님이 기다리는 일이라 빠른 게 중요합니다. 그런데 그림을 다시 만들려면
+Playwright 와 ffmpeg 이 필요하고 그 설치에만 37초가 듭니다. 캡션만 고치는 요청에는
+쓸 일이 없는 시간입니다. 그래서 두 단계로 나눴습니다.
+
+  --plan-only   가벼운 도구만으로 판단합니다. 캡션만 고치면 되는 건 여기서 끝냅니다.
+                그림을 다시 만들어야 하는 건 할 일만 적어두고 넘깁니다.
+  --apply-plan  적어둔 할 일을 처리합니다. 이때만 무거운 도구가 필요합니다.
+
+아무 것도 안 붙이면 예전처럼 한 번에 다 합니다(사람이 직접 돌릴 때).
 """
 from __future__ import annotations
 
+import argparse
 import json
 import os
 import sys
@@ -64,6 +75,12 @@ TOOL = {
         "required": ["reply"],
     },
 }
+
+
+def _plan_path() -> Path:
+    """단계 사이에 할 일을 넘기는 파일. 같은 실행 안에서만 쓰고 지웁니다."""
+    base = os.environ.get("RUNNER_TEMP") or tempfile.gettempdir()
+    return Path(base) / "revise_plan.json"
 
 
 def _rerender(row: dict, headline: str) -> list[str] | None:
@@ -143,14 +160,100 @@ def _notify(channel: str, text: str) -> None:
         print(f"  ! 텔레그램 알림 실패: {e}")
 
 
+def _ask(client, model: str, row: dict, msg: dict) -> tuple[str, str, str] | None:
+    """무엇을 어떻게 고칠지 담당자에게 물어봅니다."""
+    thread = trends_sync.fetch_approval_thread(row["id"])
+    messages = [
+        {"role": "assistant" if t["role"] == "staff" else "user", "content": t["body"]}
+        for t in thread
+    ]
+    if not messages or messages[-1]["role"] != "user":
+        messages.append({"role": "user", "content": msg["body"]})
+
+    resp = client.messages.create(
+        model=model,
+        max_tokens=4000,
+        system=SYSTEM.format(voice=HSSUP_VOICE, caption=row.get("body") or ""),
+        tools=[TOOL],
+        tool_choice={"type": "tool", "name": "revise"},
+        messages=messages,
+    )
+    tool_use = next(b for b in resp.content if b.type == "tool_use")
+    return (
+        (tool_use.input.get("reply") or "").strip(),
+        (tool_use.input.get("caption") or "").strip(),
+        (tool_use.input.get("headline") or "").strip(),
+    )
+
+
+def _finish(row: dict, msg_id: int, reply: str, caption: str, image_urls: list[str] | None) -> None:
+    """고친 내용을 반영하고 답을 남깁니다."""
+    approval_id = row["id"]
+    try:
+        trends_sync.update_approval_content(approval_id, body=caption or None, image_urls=image_urls)
+        _sync_pending_file(row, caption or None, image_urls)
+    except Exception as e:
+        print(f"  ! 반영 실패(approval {approval_id}): {e}")
+
+    trends_sync.create_approval_message(approval_id, "staff", reply)
+    trends_sync.mark_approval_message_answered(msg_id)
+    _notify(row["channel"], f"✏️ 수정 반영했어요\n\n{reply}")
+    print(f"  - 수정 처리 완료 (approval {approval_id})")
+
+
+def _set_output(name: str, value: str) -> None:
+    out = os.environ.get("GITHUB_OUTPUT")
+    if out:
+        with open(out, "a", encoding="utf-8") as f:
+            f.write(f"{name}={value}\n")
+
+
+def _apply_plan() -> int:
+    """적어둔 할 일(그림 다시 만들기)을 처리합니다."""
+    path = _plan_path()
+    if not path.exists():
+        print("다시 만들 그림이 없습니다.")
+        return 0
+
+    entries = json.loads(path.read_text(encoding="utf-8"))
+    for e in entries:
+        row, headline, reply, caption = e["row"], e["headline"], e["reply"], e["caption"]
+        image_urls = None
+        try:
+            image_urls = _rerender(row, headline)
+            if image_urls:
+                reply += f"\n\n(그림을 다시 만들었어요 — 헤드라인 「{headline}」)"
+            else:
+                reply += "\n\n(그림은 다시 만들지 못했어요. 원본을 찾을 수 없습니다.)"
+        except Exception as ex:
+            print(f"  ! 그림 다시 만들기 실패: {ex}")
+            reply += f"\n\n(그림을 다시 만들지 못했어요: {ex})"
+        _finish(row, e["message_id"], reply, caption, image_urls)
+
+    path.unlink()
+    return 0
+
+
 def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--plan-only", action="store_true",
+                        help="캡션만 고치는 건 처리하고, 그림 작업은 적어만 둔다")
+    parser.add_argument("--apply-plan", action="store_true",
+                        help="적어둔 그림 작업을 처리한다")
+    args = parser.parse_args()
+
+    if args.apply_plan:
+        return _apply_plan()
+
     pending = trends_sync.fetch_unanswered_approval_messages()
     if not pending:
         print("처리할 수정 요청이 없습니다.")
+        _set_output("needs_render", "false")
         return 0
 
     client = Anthropic()
     model = os.environ.get("CLAUDE_MODEL", DEFAULT_MODEL)
+    deferred = []
 
     for msg in pending:
         row = msg.get("ai_approvals") or {}
@@ -159,29 +262,19 @@ def main() -> int:
             trends_sync.mark_approval_message_answered(msg["id"])
             continue
 
-        thread = trends_sync.fetch_approval_thread(approval_id)
-        messages = [
-            {"role": "assistant" if t["role"] == "staff" else "user", "content": t["body"]}
-            for t in thread
-        ]
-        if not messages or messages[-1]["role"] != "user":
-            messages.append({"role": "user", "content": msg["body"]})
-
         try:
-            resp = client.messages.create(
-                model=model,
-                max_tokens=4000,
-                system=SYSTEM.format(voice=HSSUP_VOICE, caption=row.get("body") or ""),
-                tools=[TOOL],
-                tool_choice={"type": "tool", "name": "revise"},
-                messages=messages,
-            )
-            tool_use = next(b for b in resp.content if b.type == "tool_use")
-            reply = (tool_use.input.get("reply") or "").strip()
-            caption = (tool_use.input.get("caption") or "").strip()
-            headline = (tool_use.input.get("headline") or "").strip()
+            reply, caption, headline = _ask(client, model, row, msg)
         except Exception as e:
             print(f"  ! 수정안 작성 실패(approval {approval_id}): {e}")
+            continue
+
+        # 그림을 건드려야 하는 건 무거운 도구가 필요하다.
+        if headline and args.plan_only:
+            deferred.append({
+                "row": row, "message_id": msg["id"],
+                "reply": reply, "caption": caption, "headline": headline,
+            })
+            print(f"  - 그림 작업으로 넘김 (approval {approval_id}, 헤드라인 「{headline}」)")
             continue
 
         image_urls = None
@@ -196,18 +289,12 @@ def main() -> int:
                 print(f"  ! 그림 다시 만들기 실패: {e}")
                 reply += f"\n\n(그림을 다시 만들지 못했어요: {e})"
 
-        try:
-            trends_sync.update_approval_content(
-                approval_id, body=caption or None, image_urls=image_urls
-            )
-            _sync_pending_file(row, caption or None, image_urls)
-        except Exception as e:
-            print(f"  ! 반영 실패(approval {approval_id}): {e}")
+        _finish(row, msg["id"], reply, caption, image_urls)
 
-        trends_sync.create_approval_message(approval_id, "staff", reply)
-        trends_sync.mark_approval_message_answered(msg["id"])
-        _notify(row["channel"], f"✏️ 수정 반영했어요\n\n{reply}")
-        print(f"  - 수정 처리 완료 (approval {approval_id})")
+    if args.plan_only:
+        if deferred:
+            _plan_path().write_text(json.dumps(deferred, ensure_ascii=False), encoding="utf-8")
+        _set_output("needs_render", "true" if deferred else "false")
 
     return 0
 
