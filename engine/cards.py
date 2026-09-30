@@ -26,12 +26,33 @@ def is_cards_channel(cfg: dict) -> bool:
     return (cfg.get("source") or {}).get("type") == "json"
 
 
-def load_cards(cfg: dict) -> dict:
+def snapshot_path(slug: str, ref_key: str) -> Path:
+    """게시물 하나의 카드 내용을 따로 떠두는 자리.
+
+    채널 파일 하나만 쓰면 카드뉴스가 여러 개 대기할 때 섞입니다.
+    하나를 고치려다 다른 것 내용으로 다시 그려집니다.
+    그래서 그릴 때마다 그 게시물의 내용을 따로 떠둡니다.
+    """
+    return ROOT / "data" / "posts" / f"{slug}-{ref_key}.json"
+
+
+def load_cards(cfg: dict, ref_key: str = "") -> dict:
+    """그 게시물의 카드 내용. 떠둔 게 있으면 그걸 씁니다."""
+    if ref_key:
+        snap = snapshot_path(cfg["slug"], ref_key)
+        if snap.exists():
+            return json.loads(snap.read_text(encoding="utf-8"))
     return json.loads(cards_path(cfg).read_text(encoding="utf-8"))
 
 
-def save_cards(cfg: dict, data: dict) -> None:
-    cards_path(cfg).write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+def save_cards(cfg: dict, data: dict, ref_key: str = "") -> None:
+    payload = json.dumps(data, ensure_ascii=False, indent=2)
+    if ref_key:
+        snap = snapshot_path(cfg["slug"], ref_key)
+        snap.parent.mkdir(parents=True, exist_ok=True)
+        snap.write_text(payload, encoding="utf-8")
+        return
+    cards_path(cfg).write_text(payload, encoding="utf-8")
 
 
 def redraw(cfg: dict, ref_key: str) -> tuple[list[str], list[str]]:
@@ -40,13 +61,17 @@ def redraw(cfg: dict, ref_key: str) -> tuple[list[str], list[str]]:
     돌려주는 값은 (올라간 사진 주소들, 걸린 문제들) 입니다.
     문제가 있으면 부른 쪽에서 판단합니다.
     """
-    source_cfg = {
-        **cfg["source"],
-        "slug": cfg["slug"],
-        "cards": cfg.get("cards", 4),
-        "topic": cfg.get("topic", cfg["name"]),
-    }
-    data = get_source(source_cfg).load()
+    snap = snapshot_path(cfg["slug"], ref_key)
+    if snap.exists():
+        data = json.loads(snap.read_text(encoding="utf-8"))
+    else:
+        source_cfg = {
+            **cfg["source"],
+            "slug": cfg["slug"],
+            "cards": cfg.get("cards", 4),
+            "topic": cfg.get("topic", cfg["name"]),
+        }
+        data = get_source(source_cfg).load()
 
     date = dt.date.fromisoformat(data.get("date") or dt.date.today().isoformat())
     data["date"] = date.isoformat()

@@ -217,7 +217,7 @@ def _redraw_cards(row: dict, result: dict) -> tuple[list[str] | None, str]:
     css, card_edits, headline_text = result["css"], result["cards"], result["headline_text"]
 
     if card_edits or headline_text:
-        data = cards_mod.load_cards(cfg)
+        data = cards_mod.load_cards(cfg, ref_key=row["ref_key"])
         if headline_text:
             data["headline"] = headline_text
         for edit in card_edits:
@@ -227,7 +227,7 @@ def _redraw_cards(row: dict, result: dict) -> tuple[list[str] | None, str]:
             for key in ("title", "summary", "why"):
                 if edit.get(key):
                     data["items"][i][key] = edit[key]
-        cards_mod.save_cards(cfg, data)
+        cards_mod.save_cards(cfg, data, ref_key=row["ref_key"])
 
     before_css = read_design(cfg["slug"])
     if css:

@@ -68,6 +68,17 @@ def main() -> int:
         )
         print("  이미지 공개 업로드 + 승인 대기 레코드 생성 완료")
 
+        # 이 게시물의 카드 내용을 따로 떠둡니다. 나중에 고칠 때 이걸 보고 다시 그립니다.
+        # 채널 파일 하나만 쓰면 카드뉴스가 여러 개 대기할 때 서로 섞입니다.
+        try:
+            from engine import cards as cards_mod
+
+            if cards_mod.is_cards_channel(cfg):
+                cards_mod.save_cards(cfg, data, ref_key=key)
+                print(f"  카드 내용 따로 보관: data/posts/{cfg['slug']}-{key}.json")
+        except Exception as e:
+            print(f"  ! 카드 내용 보관 실패: {e}")
+
         # 앱에서도 보고 승인할 수 있게 같은 건을 올립니다.
         try:
             from engine import trends_sync
