@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <link rel="stylesheet" href="{{ css_url }}">
+{% if design_css %}<style>{{ design_css }}</style>{% endif %}
 </head>
 <body>
 <main class="card {% block kind %}{% endblock %}">

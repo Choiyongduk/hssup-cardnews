@@ -8,6 +8,7 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 from playwright.sync_api import sync_playwright
 
 from .config import ROOT
+from .design import CHECK_SCRIPT, read_design
 from .theme import pick_palette
 
 # 넘치는 텍스트를 단계적으로 줄이는 스크립트.
@@ -78,6 +79,8 @@ class Renderer:
             "font_dir": (ROOT / "assets" / "fonts").as_uri(),
             "assets_dir": (ROOT / "assets").as_uri(),
             "theme": pick_palette(dt.date.fromisoformat(data["date"]), fixed=self.cfg.get("palette")),
+            # 디자인 담당이 고친 내용을 기본 스타일 뒤에 덧씌웁니다.
+            "design_css": read_design(self.cfg["slug"]),
         }
         pages = [("01_cover", self.env.get_template("cover.html").render(page=1, **common))]
         for i, it in enumerate(items, 1):
@@ -87,6 +90,8 @@ class Renderer:
         return pages
 
     def render(self, data: dict, items: list[dict], out_dir: Path) -> list[Path]:
+        """카드를 그립니다. 그리면서 깨진 데가 있으면 self.problems 에 담습니다."""
+        self.problems: list[str] = []
         html_dir = out_dir / "html"
         html_dir.mkdir(parents=True, exist_ok=True)
         w, h = self.cfg["size"]["width"], self.cfg["size"]["height"]
@@ -102,6 +107,10 @@ class Renderer:
                 still = page.evaluate(FIT_SCRIPT)
                 if still:
                     print(f"  ! {name}: 최소 글자 크기에서도 넘침 → 문구를 줄이세요 ({', '.join(still)})")
+                    self.problems.append(f"{name}: 글자가 넘칩니다 ({', '.join(still)})")
+                for problem in page.evaluate(CHECK_SCRIPT):
+                    print(f"  ! {name}: {problem}")
+                    self.problems.append(f"{name}: {problem}")
                 png = out_dir / f"{name}.png"
                 page.screenshot(path=str(png), clip={"x": 0, "y": 0, "width": w, "height": h})
                 results.append(png)
