@@ -1,0 +1,68 @@
+name: Make Cards
+
+# 기획안을 카드뉴스로 만듭니다.
+# 박서준 팀장이 쓴 기획안 → 카드 내용 정리 → 카드 그리기 → 승인 요청까지 한 번에.
+#
+# 손으로 부릅니다. 기획안이 나왔는데 그걸 카드뉴스로 뽑고 싶을 때 돌리세요.
+# report_id 를 비워두면 가장 최근 기획안을 씁니다.
+on:
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: "채널 (channels/<이름>.yaml)"
+        required: false
+        default: "hssup-tips"
+      report_id:
+        description: "기획안 번호 (비우면 가장 최근 것)"
+        required: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: make-cards
+  cancel-in-progress: false
+
+jobs:
+  cards:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          playwright install --with-deps chromium
+
+      - name: Turn the plan into card content
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          python make_cards.py --channel "${{ inputs.channel }}" \
+            ${{ inputs.report_id && format('--report-id {0}', inputs.report_id) || '' }}
+
+      - name: Draw the cards
+        env:
+          ASSETS_REPO: ${{ secrets.ASSETS_REPO }}
+          ASSETS_REPO_TOKEN: ${{ secrets.ASSETS_REPO_TOKEN }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          HSSUP_ACADEMY_BOT_TOKEN: ${{ secrets.HSSUP_ACADEMY_BOT_TOKEN }}
+          ARTMAKE_BOT_TOKEN: ${{ secrets.ARTMAKE_BOT_TOKEN }}
+        run: python render.py --channel "${{ inputs.channel }}"
+
+      - name: Commit card content and pending record
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/ pending/
+          git diff --cached --quiet || git commit -m "chore: make cards from plan [skip ci]"
+          git pull --rebase origin master
+          git push

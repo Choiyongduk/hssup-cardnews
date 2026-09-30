@@ -80,7 +80,7 @@ html, body {
   font-size: 100px; font-weight: 800; line-height: 1.04; letter-spacing: -0.035em;
 }
 
-.index { margin-top: auto; padding-top: 52px; list-style: none; }
+.index { margin-top: 64px; list-style: none; }
 .index li {
   display: flex; align-items: baseline; gap: 26px;
   padding: 24px 0; border-top: 1px solid var(--line-on-dark);
