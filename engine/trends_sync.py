@@ -199,11 +199,17 @@ def fetch_approval_thread(approval_id: int) -> list[dict]:
     )
 
 
-def create_approval_message(approval_id: int, role: str, body: str) -> None:
-    _post(
-        "ai_approval_messages",
-        {"approval_id": approval_id, "role": role, "body": body, "answered": True},
-    )
+def create_approval_message(approval_id: int, role: str, body: str, staff_key: str = "") -> None:
+    """단체 채팅방에 한 마디 남깁니다. staff_key 는 누가 답했는지 표시용입니다."""
+    row = {"approval_id": approval_id, "role": role, "body": body, "answered": True}
+    if not staff_key:
+        _post("ai_approval_messages", row)
+        return
+    try:
+        _post("ai_approval_messages", {**row, "staff": staff_key})
+    except Exception:
+        # staff 칸이 아직 없는 데이터베이스에서도 말은 남아야 합니다.
+        _post("ai_approval_messages", row)
 
 
 def mark_approval_message_answered(message_id: int) -> None:
