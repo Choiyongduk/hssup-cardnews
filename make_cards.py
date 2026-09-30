@@ -43,20 +43,25 @@ SYSTEM = """당신은 히썹 인스타그램 계정의 카드뉴스 편집자입
 - `caption` : 인스타 캡션. 기획안에 캡션 초안이 있으면 그걸 살려 쓰세요.
   해시태그는 넣지 마세요(따로 붙습니다).
 
-표지는 주제에 맞는 짜임새를 고르세요. 매번 같은 얼굴이면 넘겨보고 싶지 않습니다.
+표지는 주제에 맞는 짜임새를 고르세요. **매번 같은 얼굴이면 안 됩니다.**
+{recent}
 
-- `cover_style` : plain / number / versus 중 하나
-  * number — 셀 수 있는 주제. 큰 숫자 하나가 주인공입니다.
-    예) "카드뉴스 비법 4가지", "실패하는 이유 7가지"
-    `cover_number` 에 숫자만 적으세요. 단위(가지, 단계)는 붙이지 마세요.
-    단위는 `kicker` 에 넣으세요. 예) kicker "바로 써먹는 4가지", 숫자 "4"
+- `cover_style` : plain / quote / versus / number 중 하나
+  * quote — 한 문장으로 밀어붙입니다. 주장이나 통념을 뒤집는 말에 어울립니다.
+    제목을 길게(스무 자 안팎) 쓰고 핵심 어절만 대괄호로 묶으세요.
+    예) "잔흔 남았다고 [무조건 레이저] 아닙니다"
   * versus — 둘을 맞세우는 주제. `versus_left` 와 `versus_right` 에 각각
-    다섯 자 이내로 짧게. 예) "릴스" 대 "피드", "저가" 대 "가치"
-  * plain — 위 둘에 안 맞으면 이걸 쓰세요. 제목 하나로 갑니다.
+    다섯 자 이내로 짧게. 예) "릴스" 대 "피드", "기술" 대 "운영"
+  * number — **의미 있는 수치가 기획안에 있을 때만** 씁니다.
+    `cover_number` 에 그 수치를 적으세요. 예) "8,875", "90%", "3년", "100만+"
+    ⚠️ 카드가 몇 장인지(4가지, 5가지)는 수치가 아닙니다. 그건 절대 쓰지 마세요.
+    기획안에 내세울 수치가 없으면 number 를 고르지 마세요.
+  * plain — 위에 안 맞으면 이걸 쓰세요. 제목 하나로 단정하게 갑니다.
 - `cover_bg` : orange(기본) 또는 ink. 대부분 orange 로 두고,
-  무겁거나 단호한 주제일 때만 ink 를 쓰세요. 열에 둘 정도입니다.
+  무겁거나 단호한 주제일 때만 ink 를 쓰세요.
 - `kicker` : 표지 맨 윗줄 작은 글씨. 한 줄, 열두 자 이내.
-  예) "바로 써먹는 4가지", "원장님 필독", "3분 정리"
+  매번 "OO 필독 4가지" 로 쓰지 마세요. 주제마다 달라야 합니다.
+  예) "3분 정리", "많이 묻는 질문", "해보고 알았습니다", "먼저 읽어보세요"
 - 표지 제목에 대괄호를 쓰면 그 부분이 강조됩니다. 한 군데만.
 
 제목과 summary 는 카드에 크게 박히는 글자입니다. 말투 규칙을 적용하지 말고
@@ -65,6 +70,9 @@ SYSTEM = """당신은 히썹 인스타그램 계정의 카드뉴스 편집자입
 명사 3개 이상을 가운뎃점(·)으로 나열하지 마세요. 한자를 쓰지 마세요.
 
 {voice}"""
+
+# 표지 짜임새. 뼈대는 같고 주인공만 바뀝니다.
+ALL_STYLES = ("plain", "quote", "versus", "number")
 
 TOOL = {
     "name": "cards",
@@ -75,7 +83,7 @@ TOOL = {
             "headline": {"type": "string"},
             "one_liner": {"type": "string"},
             "caption": {"type": "string"},
-            "cover_style": {"type": "string", "enum": ["plain", "number", "versus"]},
+            "cover_style": {"type": "string", "enum": list(ALL_STYLES)},
             "cover_bg": {"type": "string", "enum": ["orange", "ink"]},
             "kicker": {"type": "string", "description": "표지 맨 윗줄 작은 글씨"},
             "cover_number": {"type": "string", "description": "number 스타일일 때 숫자만"},
@@ -117,6 +125,62 @@ def _pick_report(report_id: int | None) -> dict:
     return rows[0]
 
 
+def _recent_styles(slug: str, limit: int = 3) -> list[str]:
+    """최근에 쓴 표지 짜임새. 같은 얼굴이 이어지지 않게 하려고 봅니다."""
+    folder = ROOT / "data" / "posts"
+    if not folder.exists():
+        return []
+    files = sorted(folder.glob(f"{slug}-*.json"), key=lambda p: p.stat().st_mtime, reverse=True)
+    out = []
+    for f in files[:limit]:
+        try:
+            out.append(json.loads(f.read_text(encoding="utf-8")).get("cover_style") or "plain")
+        except Exception:
+            continue
+    return out
+
+
+def _allowed_styles(slug: str) -> list[str]:
+    """이번에 고를 수 있는 짜임새.
+
+    "같은 건 피하라" 고 말로만 하면 안 듣습니다. 실제로 두 번 연속 같은 걸 골랐습니다.
+    목록에서 빼야 안 고릅니다. 다만 고를 게 둘은 남겨둡니다.
+    """
+    used = _recent_styles(slug, limit=2)
+    left = [s for s in ALL_STYLES if s not in set(used)]
+    return left if len(left) >= 2 else list(ALL_STYLES)
+
+
+def _recent_kickers(slug: str, limit: int = 4) -> list[str]:
+    """최근에 쓴 맨 윗줄 문구. 같은 말이 이어지면 더 획일적으로 보입니다."""
+    folder = ROOT / "data" / "posts"
+    if not folder.exists():
+        return []
+    files = sorted(folder.glob(f"{slug}-*.json"), key=lambda p: p.stat().st_mtime, reverse=True)
+    out = []
+    for f in files[:limit]:
+        try:
+            k = (json.loads(f.read_text(encoding="utf-8")).get("kicker") or "").strip()
+            if k:
+                out.append(k)
+        except Exception:
+            continue
+    return out
+
+
+def _recent_note(slug: str) -> str:
+    used = _recent_styles(slug)
+    kickers = _recent_kickers(slug)
+    lines = []
+    if used:
+        lines.append(f"최근에 쓴 짜임새: {', '.join(used)} — 그래서 이번에 고를 수 있는 건 위 목록뿐입니다.")
+    else:
+        lines.append("앞선 게시물이 없으니 주제에 가장 맞는 것을 고르세요.")
+    if kickers:
+        lines.append(f"최근에 쓴 맨 윗줄: {', '.join(kickers)} — **이것들과 다른 말로 쓰세요.**")
+    return "\n".join(lines)
+
+
 def _sections(body: str) -> list[str]:
     """리포트 하나에 기획안이 여러 개 들어 있을 때 나눕니다.
 
@@ -152,6 +216,13 @@ def main() -> int:
         print(f"기획안: [{report['kind']}] {report['title']}")
 
     lim = cfg["limits"]
+
+    # 고를 수 있는 짜임새만 남겨 건넵니다. 목록에 없으면 고를 수 없습니다.
+    allowed = _allowed_styles(cfg["slug"])
+    tool = json.loads(json.dumps(TOOL))
+    tool["input_schema"]["properties"]["cover_style"]["enum"] = allowed
+    print(f"고를 수 있는 표지: {', '.join(allowed)}")
+
     client = Anthropic()
     resp = client.messages.create(
         model=os.environ.get("CLAUDE_MODEL", DEFAULT_MODEL),
@@ -161,9 +232,10 @@ def main() -> int:
             lines=lim["summary_lines"],
             line_limit=lim["summary_line"],
             title_limit=lim["title"],
+            recent=_recent_note(cfg["slug"]),
             voice=HSSUP_VOICE,
         ),
-        tools=[TOOL],
+        tools=[tool],
         tool_choice={"type": "tool", "name": "cards"},
         messages=[{"role": "user", "content": body}],
     )
@@ -174,9 +246,29 @@ def main() -> int:
         raise SystemExit(f"카드 {cfg['cards']}장이 필요한데 {len(items)}장만 왔습니다.")
 
     style = out.get("cover_style") or "plain"
-    # versus 는 양쪽이 다 있어야 성립합니다. 하나라도 비면 기본형으로 내립니다.
-    if style == "versus" and not (out.get("versus_left") and out.get("versus_right")):
+    number = (out.get("cover_number") or "").strip()
+    has_versus = bool(out.get("versus_left") and out.get("versus_right"))
+    # 카드 장 수를 수치라고 내놓는 일이 잦습니다. 그건 숫자형의 주인공이 아닙니다.
+    has_number = bool(number) and number != str(cfg["cards"])
+
+    def _viable(s: str) -> bool:
+        if s == "versus":
+            return has_versus
+        if s == "number":
+            return has_number
+        return True
+
+    # 짜임새마다 꼭 있어야 하는 게 빠지면 쓸 수 없습니다.
+    if not _viable(style):
+        print(f"  ! {style} 에 필요한 값이 없습니다")
         style = "plain"
+
+    # 목록에 없는 걸 골라 오는 일이 있습니다. 도구 제약은 강제가 아닙니다.
+    # 같은 얼굴이 이어지지 않으려고 좁혀둔 것이므로 여기서 다시 막습니다.
+    if style not in allowed:
+        replacement = next((s for s in allowed if _viable(s)), "plain")
+        print(f"  ! {style} 는 최근에 써서 뺐습니다 → {replacement}")
+        style = replacement
 
     data = {
         "date": None,
@@ -186,7 +278,7 @@ def main() -> int:
         "cover_style": style,
         "cover_bg": out.get("cover_bg") or "orange",
         "kicker": (out.get("kicker") or "").strip(),
-        "cover_number": (out.get("cover_number") or "").strip(),
+        "cover_number": number,
         "cover_unit": (out.get("cover_unit") or "").strip(),
         "versus_left": (out.get("versus_left") or "").strip(),
         "versus_right": (out.get("versus_right") or "").strip(),

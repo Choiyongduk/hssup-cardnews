@@ -7,9 +7,10 @@
 </head>
 <body>
 <main class="card {% block kind %}{% endblock %}">
+  {# 날짜는 넣지 않습니다. 카드뉴스는 며칠 뒤에 봐도 유효한 내용이라
+     날짜가 붙으면 오래된 글처럼 보입니다. #}
   <header class="topbar">
     <img class="logo" src="{{ assets_dir }}/logos/hssup-wordmark.png">
-    <span>{{ data.date_label }}</span>
   </header>
   {% block content %}{% endblock %}
   <footer class="footer">

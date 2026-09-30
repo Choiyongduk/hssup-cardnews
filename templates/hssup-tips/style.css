@@ -84,8 +84,12 @@ html, body {
 .card.cover .footer .page b { color: var(--paper); }
 .card.cover .topbar .logo { filter: brightness(0) invert(1); }
 
+/* 표지 내용을 세로 가운데로 모읍니다. 위로 몰면 아래가 통째로 비어
+   빠뜨린 것처럼 보입니다. 가운데로 두면 여백이 의도로 읽힙니다. */
+.card.cover .fit-box { justify-content: center; }
+
 .kicker {
-  margin-top: 84px;
+  margin-top: 0;
   font-size: 26px; font-weight: 800; letter-spacing: 0.22em;
   color: rgba(255, 255, 255, 0.85);
 }
@@ -132,17 +136,13 @@ html, body {
 .style-number .index { margin-top: 44px; }
 .style-number .index li { padding: 18px 0; font-size: 30px; }
 
-/* 한마디형 — 문장 하나로 밀어붙입니다. 목차 대신 밑줄로 힘을 줍니다 */
-.style-quote .headline { font-size: 116px; line-height: 1.06; }
-.style-quote .index { margin-top: auto; padding-top: 44px; }
-.style-quote .index li { border: none; padding: 10px 0; font-size: 30px; opacity: 0.88; }
+/* 한마디형 — 문장 하나로 밀어붙입니다. 제목이 화면을 거의 다 씁니다 */
+.style-quote .headline { font-size: 112px; line-height: 1.08; }
+.style-quote .index { margin-top: 72px; }
+.style-quote .index li { border: none; padding: 12px 0; font-size: 30px; opacity: 0.86; }
 .style-quote .index li:last-child { border: none; }
-.style-quote .hl {
-  /* 색 대신 밑줄로 긋습니다. 바탕이 색면일 때 더 잘 읽힙니다 */
-  color: inherit;
-  box-shadow: inset 0 -0.22em 0 rgba(255, 255, 255, 0.28);
-}
-.card.cover.bg-ink.style-quote .hl { box-shadow: inset 0 -0.22em 0 var(--accent); }
+/* 강조는 색으로만. 밑줄을 겹치면 글자 가운데를 지나가 지저분해집니다. */
+.card.cover.bg-ink.style-quote .hl { color: var(--accent); }
 
 /* 대비형 — A 와 B 를 맞세웁니다 */
 .versus { margin-top: 64px; display: flex; align-items: center; gap: 36px; }

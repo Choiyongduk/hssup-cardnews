@@ -6,8 +6,12 @@
   <p class="kicker">{{ data.kicker or ('바로 써먹는 ' ~ items|length ~ '가지') }}</p>
 
   {% if data.cover_style == 'number' %}
-    <span class="bignumber" data-fit="140">{{ data.cover_number or items|length }}</span>
+    <span class="bignumber" data-fit="140">{{ data.cover_number }}</span>
     <h1 class="headline" data-fit="40">{{ data.headline|hl }}</h1>
+
+  {% elif data.cover_style == 'quote' %}
+    {# 문장 하나로 밀어붙입니다. 목차는 아래에 작게 깔립니다. #}
+    <h1 class="headline" data-fit="52">{{ data.headline|hl }}</h1>
 
   {% elif data.cover_style == 'versus' %}
     <div class="versus">
