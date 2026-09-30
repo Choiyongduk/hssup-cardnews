@@ -117,10 +117,22 @@ def _pick_report(report_id: int | None) -> dict:
     return rows[0]
 
 
+def _sections(body: str) -> list[str]:
+    """리포트 하나에 기획안이 여러 개 들어 있을 때 나눕니다.
+
+    요청을 여러 건 한 번에 처리하면 한 리포트에 같이 담깁니다.
+    그중 하나만 카드로 만들고 싶을 때가 있습니다.
+    """
+    parts = [p.strip() for p in body.split("\n---\n")]
+    return [p for p in parts if p]
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--channel", default="hssup-tips", help="channels/<이름>.yaml")
     ap.add_argument("--report-id", type=int, help="옮길 기획안 번호 (기본: 가장 최근)")
+    ap.add_argument("--section", type=int,
+                    help="리포트에 기획안이 여러 개면 몇 번째를 쓸지 (1부터)")
     args = ap.parse_args()
 
     cfg = load_channel(args.channel)
@@ -129,7 +141,15 @@ def main() -> int:
         raise SystemExit(f"{args.channel} 은 직접 쓴 내용을 받는 채널이 아닙니다.")
 
     report = _pick_report(args.report_id)
-    print(f"기획안: [{report['kind']}] {report['title']}")
+    body = report["body"]
+    if args.section:
+        parts = _sections(body)
+        if not (1 <= args.section <= len(parts)):
+            raise SystemExit(f"기획안이 {len(parts)}개인데 {args.section}번을 달라고 했습니다.")
+        body = parts[args.section - 1]
+        print(f"기획안: [{report['kind']}] {report['title']} — {args.section}번째")
+    else:
+        print(f"기획안: [{report['kind']}] {report['title']}")
 
     lim = cfg["limits"]
     client = Anthropic()
@@ -145,7 +165,7 @@ def main() -> int:
         ),
         tools=[TOOL],
         tool_choice={"type": "tool", "name": "cards"},
-        messages=[{"role": "user", "content": report["body"]}],
+        messages=[{"role": "user", "content": body}],
     )
     out = next(b for b in resp.content if b.type == "tool_use").input
 
