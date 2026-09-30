@@ -124,6 +124,18 @@ TOOL = {
 }
 
 
+def _clean(text: str) -> str:
+    """빈 값을 빈 값으로 받습니다.
+
+    "안 고쳤다" 는 뜻으로 따옴표 두 개만 보내오는 경우가 있었고, 그게 그대로
+    캡션으로 저장돼 글이 통째로 날아갔습니다. 따옴표만 남으면 비운 것으로 봅니다.
+    """
+    out = (text or "").strip()
+    while len(out) >= 2 and out[0] == out[-1] and out[0] in "\"'":
+        out = out[1:-1].strip()
+    return out
+
+
 def _plan_path() -> Path:
     """단계 사이에 할 일을 넘기는 파일. 같은 실행 안에서만 쓰고 지웁니다."""
     base = os.environ.get("RUNNER_TEMP") or tempfile.gettempdir()
@@ -285,11 +297,11 @@ def _ask(client, model: str, row: dict, msg: dict) -> dict:
     return {
         "staff": out.get("staff") or staff.DEFAULT,
         "reply": (out.get("reply") or "").strip(),
-        "caption": (out.get("caption") or "").strip(),
-        "headline": (out.get("headline") or "").strip(),
+        "caption": _clean(out.get("caption")),
+        "headline": _clean(out.get("headline")),
         "css": (out.get("css") or "").strip(),
         "cards": out.get("cards") or [],
-        "headline_text": (out.get("headline_text") or "").strip(),
+        "headline_text": _clean(out.get("headline_text")),
     }
 
 
