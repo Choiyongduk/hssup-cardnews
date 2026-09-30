@@ -18,7 +18,7 @@ source:
 limits:
   title: 30
   summary_line: 40
-  summary_lines: 3
+  summary_lines: 4
 
 outro:
   cta_title: 실전 팁 더 받아보기

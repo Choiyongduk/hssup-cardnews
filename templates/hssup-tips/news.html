@@ -1,15 +1,16 @@
 {% extends "base.html" %}
 {% block kind %}news{% endblock %}
 {% block content %}
-<section class="fit-box accent-{{ ((index - 1) % 3) + 1 }}" data-name="news-{{ index }}">
-  <span class="tag">STEP {{ index }}</span>
-  <h1 class="title" data-fit="48">{{ item.title }}</h1>
+<span class="bignum">{{ "%02d"|format(index) }}</span>
+<section class="fit-box" data-name="news-{{ index }}">
+  <span class="tag">STEP {{ "%02d"|format(index) }}</span>
+  <h1 class="title" data-fit="46">{{ item.title }}</h1>
   <ul class="summary">
-    {% for line in item.summary %}<li data-fit="30">{{ line }}</li>{% endfor %}
+    {% for line in item.summary %}<li data-fit="28">{{ line }}</li>{% endfor %}
   </ul>
   <div class="why">
-    <p class="label"><span class="check">✓</span>이것만 기억하세요</p>
-    <p data-fit="26">{{ item.why }}</p>
+    <p class="label">이것만 기억하세요</p>
+    <p data-fit="28">{{ item.why }}</p>
   </div>
 </section>
 {% endblock %}

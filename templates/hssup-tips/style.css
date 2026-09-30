@@ -1,4 +1,9 @@
-/* hssup-news 테마: HISSUP 브랜드(오렌지 #FA5500 + 블랙 + 화이트) 고정 팔레트. */
+/* hssup-tips 테마.
+   브랜드 레퍼런스(에디토리얼 캠페인 톤)를 따랐습니다.
+   - 상자와 그림자를 걷어내고 색면과 가는 선으로만 나눕니다
+   - 번호를 화면 밖으로 흘려보내 그래픽 요소로 씁니다
+   - 제목은 크게 키우고 자간을 좁혀 단단하게 세웁니다
+   팔레트는 히썹 그대로(오렌지 + 블랙 + 화이트)입니다. */
 @font-face { font-family: "Pretendard"; font-weight: 400; src: url("../../assets/fonts/Pretendard-Regular.woff2") format("woff2"); }
 @font-face { font-family: "Pretendard"; font-weight: 500; src: url("../../assets/fonts/Pretendard-Medium.woff2") format("woff2"); }
 @font-face { font-family: "Pretendard"; font-weight: 600; src: url("../../assets/fonts/Pretendard-SemiBold.woff2") format("woff2"); }
@@ -6,22 +11,17 @@
 @font-face { font-family: "Pretendard"; font-weight: 800; src: url("../../assets/fonts/Pretendard-ExtraBold.woff2") format("woff2"); }
 
 :root {
-  --ink: #0A0A0A;          /* 블랙 배경/텍스트 */
-  --paper: #FFFFFF;        /* 화이트 배경 */
-  --orange: #FA5500;       /* HISSUP 시그니처 오렌지 */
-  --muted: rgba(10, 10, 10, 0.55);
-  --muted-on-dark: rgba(255, 255, 255, 0.6);
-  --line: rgba(10, 10, 10, 0.14);
+  --ink: #0A0A0A;
+  --paper: #FFFFFF;
+  --orange: #FA5500;
+  --muted: rgba(10, 10, 10, 0.5);
+  --muted-on-dark: rgba(255, 255, 255, 0.55);
+  --line: rgba(10, 10, 10, 0.12);
+  --line-on-dark: rgba(255, 255, 255, 0.18);
 
-  --pad-x: 88px;
-  --pad-top: 96px;
-  --pad-bottom: 84px;
-
-  --fs-headline: 92px;
-  --fs-title: 68px;
-  --fs-body: 40px;
-  --fs-why: 36px;
-  --fs-meta: 26px;
+  --pad-x: 84px;
+  --pad-top: 72px;
+  --pad-bottom: 68px;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -37,130 +37,124 @@ html, body {
 }
 
 .card {
-  position: relative; width: 100%; height: 100%;
+  position: relative; width: 100%; height: 100%; overflow: hidden;
   display: flex; flex-direction: column;
   padding: var(--pad-top) var(--pad-x) var(--pad-bottom);
   background: var(--paper);
 }
 
-/* 좌측 시그널 바 */
-.card::before {
-  content: ""; position: absolute; left: 0; top: var(--pad-top);
-  width: 14px; height: 120px; background: var(--orange);
-  border-radius: 0 6px 6px 0;
-}
-
+/* 위아래 얇은 정보 줄 */
 .topbar {
-  display: flex; justify-content: space-between; align-items: center;
-  font-size: var(--fs-meta); color: var(--muted); font-weight: 600;
-  padding-bottom: 28px; border-bottom: 2px solid var(--line);
+  display: flex; align-items: center; justify-content: space-between;
+  font-size: 24px; font-weight: 500; color: var(--muted);
+  letter-spacing: 0.02em;
 }
-.topbar .logo {
-  height: 32px; display: block;
-  background: var(--paper); padding: 10px 20px; border-radius: 999px;
-  border: 2px solid var(--line);
-}
+.topbar .logo { height: 26px; }
 
 .footer {
-  display: flex; justify-content: space-between; align-items: center;
-  font-size: var(--fs-meta); color: var(--muted); font-weight: 600;
-  padding-top: 28px; border-top: 2px solid var(--line);
+  margin-top: auto;
+  display: flex; align-items: flex-end; justify-content: space-between;
+  font-size: 24px; font-weight: 500; color: var(--muted);
+  padding-top: 28px; border-top: 1px solid var(--line);
 }
 .footer .page b { color: var(--ink); font-weight: 800; }
 
-.fit-box { flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; padding-bottom: 40px; }
+.fit-box { flex: 1; display: flex; flex-direction: column; min-height: 0; }
 
-/* ---------- 표지: 화이트 베이스 + 오렌지 포인트 ---------- */
-.cover { background: var(--paper); }
-.cover .fit-box { justify-content: center; }
-.cover .kicker { font-size: 34px; color: var(--orange); font-weight: 800; margin-bottom: 32px; }
-.cover .headline {
-  font-size: var(--fs-headline); font-weight: 800; line-height: 1.18; letter-spacing: -0.03em;
-  color: var(--ink);
-}
-.cover .index {
-  margin-top: 64px; list-style: none;
-  background: var(--paper); border-radius: 24px; padding: 8px 36px;
-  border: 3px solid var(--orange); box-shadow: 10px 10px 0 var(--orange);
-}
-.cover .index li {
-  display: flex; gap: 24px; align-items: center;
-  padding: 22px 0; border-top: 1px solid var(--line);
-  font-size: 32px; font-weight: 600; line-height: 1.35;
-}
-.cover .index li:first-child { border-top: none; }
-.cover .index .no {
-  display: inline-flex; align-items: center; justify-content: center; flex: none;
-  width: 52px; height: 52px; border-radius: 50%;
-  font-size: 26px; font-weight: 800; color: var(--paper);
-  background: var(--orange);
-  border: 3px solid var(--ink); box-shadow: 3px 3px 0 var(--ink);
+/* ---------- 표지: 오렌지 색면 ---------- */
+.card.cover { background: var(--orange); color: var(--paper); }
+.card.cover .topbar,
+.card.cover .footer { color: rgba(255, 255, 255, 0.72); }
+.card.cover .footer { border-top-color: var(--line-on-dark); }
+.card.cover .footer .page b { color: var(--paper); }
+.card.cover .topbar .logo { filter: brightness(0) invert(1); }
+
+.kicker {
+  margin-top: 88px;
+  font-size: 26px; font-weight: 800; letter-spacing: 0.22em;
+  color: rgba(255, 255, 255, 0.8);
 }
 
-/* ---------- 뉴스: 화이트 베이스 + 오렌지 포인트 ---------- */
-.news .fit-box { padding-top: 56px; }
-.news .tag {
-  align-self: flex-start; display: inline-flex; align-items: center; justify-content: center;
-  padding: 14px 30px; border-radius: 999px;
-  font-size: 28px; font-weight: 800; margin-bottom: 36px;
-  background: var(--orange); color: var(--paper);
-  border: 3px solid var(--ink); box-shadow: 5px 5px 0 var(--ink);
+.headline {
+  margin-top: 26px;
+  font-size: 100px; font-weight: 800; line-height: 1.04; letter-spacing: -0.035em;
 }
 
-.news .title {
-  font-size: var(--fs-title); font-weight: 800; line-height: 1.22; letter-spacing: -0.025em;
-  color: var(--ink); margin-bottom: 52px;
+.index { margin-top: auto; padding-top: 52px; list-style: none; }
+.index li {
+  display: flex; align-items: baseline; gap: 26px;
+  padding: 24px 0; border-top: 1px solid var(--line-on-dark);
+  font-size: 34px; font-weight: 600; line-height: 1.3;
 }
-.news .summary { list-style: none; display: flex; flex-direction: column; gap: 26px; }
-.news .summary li {
-  position: relative; padding-left: 36px;
-  font-size: var(--fs-body); font-weight: 500; line-height: 1.45; color: var(--ink);
-}
-.news .summary li::before {
-  content: ""; position: absolute; left: 0; top: 0.62em;
-  width: 14px; height: 14px; border-radius: 50%; background: var(--orange);
-  border: 2px solid var(--ink);
+.index li:last-child { border-bottom: 1px solid var(--line-on-dark); }
+.index .no {
+  font-size: 24px; font-weight: 800; letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.62); flex: none; min-width: 42px;
 }
 
-.news .why {
-  margin-top: auto; background: var(--ink); border-radius: 20px;
-  padding: 36px 40px;
-  border: 3px solid var(--orange); box-shadow: 8px 8px 0 var(--ink);
+/* ---------- 본문 카드 ---------- */
+/* 번호를 오른쪽 위로 크게 흘려보냅니다. 상자 대신 이게 화면을 잡아줍니다. */
+.bignum {
+  position: absolute; top: 112px; right: -24px;
+  font-size: 300px; font-weight: 800; line-height: 0.8; letter-spacing: -0.05em;
+  color: var(--orange); opacity: 0.1;
 }
-.news .why .label {
-  display: flex; align-items: center; gap: 10px;
-  font-size: 26px; font-weight: 800; letter-spacing: 0.04em;
-  color: var(--orange); margin-bottom: 14px;
-}
-.news .why .check {
-  display: inline-flex; align-items: center; justify-content: center; flex: none;
-  width: 30px; height: 30px; border-radius: 50%;
-  font-size: 18px; font-weight: 800; color: var(--paper);
-  background: var(--orange); border: 2px solid var(--ink);
-}
-.news .why p { font-size: var(--fs-why); font-weight: 600; line-height: 1.45; color: var(--paper); }
-.news .source { margin-top: 28px; font-size: 24px; color: var(--muted); font-weight: 600; }
-.news .source-url { display: inline-block; margin-top: 4px; font-size: 20px; font-weight: 500; color: var(--muted); }
 
-/* ---------- 마무리: 화이트 베이스 + 오렌지 포인트 ---------- */
-.outro { background: var(--paper); color: var(--ink); }
+.tag {
+  display: inline-block; margin-top: 72px;
+  font-size: 26px; font-weight: 800; letter-spacing: 0.22em;
+  color: var(--orange);
+}
 
-.outro .fit-box { justify-content: center; }
-.outro .label { font-size: 34px; color: var(--orange); font-weight: 800; margin-bottom: 30px; }
-.outro .one-liner {
-  font-size: 64px; font-weight: 800; line-height: 1.3; letter-spacing: -0.025em;
-  color: var(--ink);
+.title {
+  margin-top: 20px;
+  font-size: 76px; font-weight: 800; line-height: 1.1; letter-spacing: -0.035em;
 }
-.outro .cta {
-  margin-top: 88px; padding: 44px 44px; border-radius: 24px;
-  background: var(--paper);
-  border: 3px solid var(--orange); box-shadow: 10px 10px 0 var(--orange);
+
+.summary {
+  margin-top: 40px; list-style: none;
+  flex: 1; display: flex; flex-direction: column; justify-content: space-between;
 }
-.outro .cta h2 { font-size: 44px; font-weight: 800; margin-bottom: 16px; color: var(--ink); }
-.outro .cta p { font-size: 30px; color: rgba(10, 10, 10, 0.65); line-height: 1.5; font-weight: 500; }
-.outro .cta .handle {
-  margin-top: 28px; display: inline-flex;
-  font-size: 32px; font-weight: 800; color: var(--paper);
-  background: var(--orange); padding: 16px 30px; border-radius: 999px;
-  border: 3px solid var(--ink); box-shadow: 4px 4px 0 var(--ink);
+.summary li {
+  position: relative; flex: 1;
+  display: flex; align-items: center;
+  padding: 0 0 0 44px;
+  border-top: 1px solid var(--line);
+  font-size: 42px; font-weight: 500; line-height: 1.34; color: rgba(10, 10, 10, 0.88);
 }
+.summary li:last-child { border-bottom: 1px solid var(--line); }
+.summary li::before {
+  content: ""; position: absolute; left: 0; top: 50%;
+  width: 22px; height: 3px; background: var(--orange);
+}
+
+/* 한 줄 요점 — 검은 상자 대신 오렌지 선 하나로 눌러줍니다 */
+.why { margin-top: 40px; padding-top: 32px; border-top: 4px solid var(--orange); }
+.why .label {
+  font-size: 24px; font-weight: 800; letter-spacing: 0.2em;
+  color: var(--orange); margin-bottom: 12px;
+}
+.why p { font-size: 40px; font-weight: 700; line-height: 1.32; letter-spacing: -0.02em; }
+
+/* ---------- 마무리: 블랙 색면 ---------- */
+.card.outro { background: var(--ink); color: var(--paper); }
+.card.outro .topbar,
+.card.outro .footer { color: var(--muted-on-dark); }
+.card.outro .footer { border-top-color: var(--line-on-dark); }
+.card.outro .footer .page b { color: var(--paper); }
+.card.outro .topbar .logo { filter: brightness(0) invert(1); }
+
+.card.outro .label {
+  margin-top: 92px;
+  font-size: 26px; font-weight: 800; letter-spacing: 0.22em;
+  color: var(--orange);
+}
+.one-liner {
+  margin-top: 24px;
+  font-size: 82px; font-weight: 800; line-height: 1.12; letter-spacing: -0.035em;
+}
+
+.cta { margin-top: auto; padding-top: 38px; border-top: 4px solid var(--orange); }
+.cta h2 { font-size: 44px; font-weight: 800; letter-spacing: -0.02em; }
+.cta p { margin-top: 14px; font-size: 31px; font-weight: 500; line-height: 1.45; color: var(--muted-on-dark); }
+.cta .handle { margin-top: 28px; font-size: 34px; font-weight: 800; color: var(--orange); }
