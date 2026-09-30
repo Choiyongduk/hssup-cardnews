@@ -1,0 +1,55 @@
+name: Daily Brief
+
+# 아침 보고와 월요일 회의록.
+# 전부 원장님이 앱을 열어야 돌아갔는데, 이건 먼저 말을 겁니다.
+#
+# cron-job.org 가 매일 아침 8시(KST)에 호출합니다.
+# 월요일이면 회의록도 같이 씁니다.
+on:
+  workflow_dispatch:
+    inputs:
+      meeting:
+        description: "회의록도 쓸지 (yes/no/auto)"
+        required: false
+        default: "auto"
+
+permissions:
+  contents: read
+
+jobs:
+  brief:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install anthropic PyYAML python-dotenv requests
+
+      - name: Write the morning brief
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          HSSUP_ACADEMY_BOT_TOKEN: ${{ secrets.HSSUP_ACADEMY_BOT_TOKEN }}
+        run: python morning_brief.py
+
+      # 월요일에만 회의를 엽니다. 매일 하면 아무도 안 읽습니다.
+      - name: Hold the weekly meeting
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          HSSUP_ACADEMY_BOT_TOKEN: ${{ secrets.HSSUP_ACADEMY_BOT_TOKEN }}
+          WANT: ${{ inputs.meeting }}
+        run: |
+          DOW=$(TZ=Asia/Seoul date +%u)
+          if [ "$WANT" = "yes" ] || { [ "$WANT" != "no" ] && [ "$DOW" = "1" ]; }; then
+            python weekly_meeting.py
+          else
+            echo "오늘은 회의 없는 날입니다 (요일 $DOW)"
+          fi
