@@ -62,19 +62,24 @@ html, body {
 
 .fit-box { flex: 1; display: flex; flex-direction: column; min-height: 0; }
 
-/* ---------- 표지: 오렌지 색면 ---------- */
-.card.cover { background: var(--ink); color: var(--paper); }
-/* 옅은 격자 — 평평한 검정보다 화면에 깊이가 생긴다 */
+/* ---------- 표지 ----------
+   바탕은 오렌지가 기본입니다. 주제에 따라 검정으로 바꿀 수 있습니다.
+   짜임새(cover_style)는 여러 가지지만 뼈대는 같습니다 —
+   위아래 정보 줄, 큰 제목, 아래 목차. 그래서 흐름이 흐트러지지 않습니다. */
+.card.cover { background: var(--orange); color: var(--paper); }
+.card.cover.bg-ink { background: var(--ink); }
+
+/* 옅은 격자 — 평평한 색면보다 화면에 깊이가 생긴다 */
 .card.cover::after {
   content: ""; position: absolute; inset: 0; pointer-events: none;
   background-image:
-    linear-gradient(rgba(255, 255, 255, 0.045) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.045) 1px, transparent 1px);
+    linear-gradient(rgba(255, 255, 255, 0.055) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.055) 1px, transparent 1px);
   background-size: 72px 72px;
 }
 .card.cover > * { position: relative; z-index: 1; }
 .card.cover .topbar,
-.card.cover .footer { color: rgba(255, 255, 255, 0.6); }
+.card.cover .footer { color: rgba(255, 255, 255, 0.62); }
 .card.cover .footer { border-top-color: var(--line-on-dark); }
 .card.cover .footer .page b { color: var(--paper); }
 .card.cover .topbar .logo { filter: brightness(0) invert(1); }
@@ -82,11 +87,13 @@ html, body {
 .kicker {
   margin-top: 84px;
   font-size: 26px; font-weight: 800; letter-spacing: 0.22em;
-  color: var(--orange);
+  color: rgba(255, 255, 255, 0.85);
 }
+.card.cover.bg-ink .kicker { color: var(--orange); }
 
 /* 제목 위 짧은 선 하나. 시선을 제목으로 끌어준다 */
-.dash { display: block; width: 76px; height: 6px; background: var(--accent); margin: 30px 0 22px; }
+.dash { display: block; width: 76px; height: 6px; background: var(--paper); margin: 30px 0 22px; }
+.card.cover.bg-ink .dash { background: var(--accent); }
 
 .headline {
   font-size: 100px; font-weight: 800; line-height: 1.04; letter-spacing: -0.035em;
@@ -94,6 +101,8 @@ html, body {
 
 /* 강조 단어 — 한 장에 한 군데만 */
 .hl { font-style: normal; color: var(--accent); }
+/* 주황 바탕에서는 강조를 검정으로. 주황 위 핑크는 안 보인다. */
+.card.cover:not(.bg-ink) .hl { color: var(--ink); }
 
 .index { margin-top: 64px; list-style: none; }
 .index li {
@@ -104,8 +113,50 @@ html, body {
 .index li:last-child { border-bottom: 1px solid var(--line-on-dark); }
 .index .no {
   font-size: 24px; font-weight: 800; letter-spacing: 0.08em;
-  color: var(--orange); flex: none; min-width: 42px;
+  color: rgba(255, 255, 255, 0.72); flex: none; min-width: 42px;
 }
+.card.cover.bg-ink .index .no { color: var(--orange); }
+
+/* ── 표지 짜임새 ──────────────────────────────────────
+   같은 뼈대 위에서 주인공만 바꿉니다. 주제마다 다른 얼굴이 나오되
+   한 계정에서 나온 것으로 보이게. */
+
+/* 숫자형 — 큰 수가 주인공. "99가지", "4단계" 처럼 셀 수 있는 주제에.
+   숫자만 크게 둡니다. 한글 단위를 옆에 붙이면 글꼴 높이가 달라 숫자에 겹칩니다.
+   단위는 맨 윗줄(kicker)이 이미 말해 줍니다. */
+.bignumber {
+  display: block; margin-top: 52px;
+  font-size: 320px; font-weight: 800; line-height: 0.88; letter-spacing: -0.06em;
+}
+.style-number .headline { font-size: 68px; margin-top: 18px; line-height: 1.16; }
+.style-number .index { margin-top: 44px; }
+.style-number .index li { padding: 18px 0; font-size: 30px; }
+
+/* 한마디형 — 문장 하나로 밀어붙입니다. 목차 대신 밑줄로 힘을 줍니다 */
+.style-quote .headline { font-size: 116px; line-height: 1.06; }
+.style-quote .index { margin-top: auto; padding-top: 44px; }
+.style-quote .index li { border: none; padding: 10px 0; font-size: 30px; opacity: 0.88; }
+.style-quote .index li:last-child { border: none; }
+.style-quote .hl {
+  /* 색 대신 밑줄로 긋습니다. 바탕이 색면일 때 더 잘 읽힙니다 */
+  color: inherit;
+  box-shadow: inset 0 -0.22em 0 rgba(255, 255, 255, 0.28);
+}
+.card.cover.bg-ink.style-quote .hl { box-shadow: inset 0 -0.22em 0 var(--accent); }
+
+/* 대비형 — A 와 B 를 맞세웁니다 */
+.versus { margin-top: 64px; display: flex; align-items: center; gap: 36px; }
+.versus .side {
+  font-size: 104px; font-weight: 800; line-height: 1; letter-spacing: -0.04em;
+}
+.versus .vs {
+  font-size: 64px; font-weight: 800; letter-spacing: -0.02em;
+  color: var(--ink); opacity: 0.55;
+}
+.card.cover.bg-ink .versus .vs { color: var(--accent); opacity: 1; }
+.style-versus .headline { font-size: 46px; font-weight: 600; margin-top: 40px; line-height: 1.4; opacity: 0.92; }
+.style-versus .index { margin-top: 64px; }
+.style-versus .index li { padding: 22px 0; font-size: 32px; }
 
 /* ---------- 본문 카드 ---------- */
 /* 번호를 오른쪽 위로 크게 흘려보냅니다. 상자 대신 이게 화면을 잡아줍니다. */

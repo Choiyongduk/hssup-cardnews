@@ -1,13 +1,30 @@
 {% extends "base.html" %}
-{% block kind %}cover{% endblock %}
+{% block kind %}cover{% if data.cover_style %} style-{{ data.cover_style }}{% endif %}{% if data.cover_bg == 'ink' %} bg-ink{% endif %}{% endblock %}
 {% block content %}
+{# 표지 짜임새는 주제에 따라 고릅니다. 뼈대는 같고 주인공만 바뀝니다. #}
 <section class="fit-box" data-name="cover">
-  <p class="kicker">바로 써먹는 {{ items|length }}가지</p>
-  <span class="dash"></span>
-  <h1 class="headline" data-fit="58">{{ data.headline|hl }}</h1>
+  <p class="kicker">{{ data.kicker or ('바로 써먹는 ' ~ items|length ~ '가지') }}</p>
+
+  {% if data.cover_style == 'number' %}
+    <span class="bignumber" data-fit="140">{{ data.cover_number or items|length }}</span>
+    <h1 class="headline" data-fit="40">{{ data.headline|hl }}</h1>
+
+  {% elif data.cover_style == 'versus' %}
+    <div class="versus">
+      <span class="side" data-fit="52">{{ data.versus_left }}</span>
+      <span class="vs">VS</span>
+      <span class="side" data-fit="52">{{ data.versus_right }}</span>
+    </div>
+    <h1 class="headline" data-fit="30">{{ data.headline|hl }}</h1>
+
+  {% else %}
+    <span class="dash"></span>
+    <h1 class="headline" data-fit="52">{{ data.headline|hl }}</h1>
+  {% endif %}
+
   <ol class="index">
     {% for it in items %}
-    <li><span class="no">{{ "%02d"|format(loop.index) }}</span><span data-fit="24">{{ it.title }}</span></li>
+    <li><span class="no">{{ "%02d"|format(loop.index) }}</span><span data-fit="22">{{ it.title }}</span></li>
     {% endfor %}
   </ol>
 </section>

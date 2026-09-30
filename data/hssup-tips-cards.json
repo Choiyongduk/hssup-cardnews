@@ -60,5 +60,8 @@
         "url": ""
       }
     }
-  ]
+  ],
+  "cover_style": "plain",
+  "cover_bg": "orange",
+  "kicker": "바로 써먹는 4가지"
 }

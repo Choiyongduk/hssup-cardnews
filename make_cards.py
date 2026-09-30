@@ -43,6 +43,22 @@ SYSTEM = """당신은 히썹 인스타그램 계정의 카드뉴스 편집자입
 - `caption` : 인스타 캡션. 기획안에 캡션 초안이 있으면 그걸 살려 쓰세요.
   해시태그는 넣지 마세요(따로 붙습니다).
 
+표지는 주제에 맞는 짜임새를 고르세요. 매번 같은 얼굴이면 넘겨보고 싶지 않습니다.
+
+- `cover_style` : plain / number / versus 중 하나
+  * number — 셀 수 있는 주제. 큰 숫자 하나가 주인공입니다.
+    예) "카드뉴스 비법 4가지", "실패하는 이유 7가지"
+    `cover_number` 에 숫자만 적으세요. 단위(가지, 단계)는 붙이지 마세요.
+    단위는 `kicker` 에 넣으세요. 예) kicker "바로 써먹는 4가지", 숫자 "4"
+  * versus — 둘을 맞세우는 주제. `versus_left` 와 `versus_right` 에 각각
+    다섯 자 이내로 짧게. 예) "릴스" 대 "피드", "저가" 대 "가치"
+  * plain — 위 둘에 안 맞으면 이걸 쓰세요. 제목 하나로 갑니다.
+- `cover_bg` : orange(기본) 또는 ink. 대부분 orange 로 두고,
+  무겁거나 단호한 주제일 때만 ink 를 쓰세요. 열에 둘 정도입니다.
+- `kicker` : 표지 맨 윗줄 작은 글씨. 한 줄, 열두 자 이내.
+  예) "바로 써먹는 4가지", "원장님 필독", "3분 정리"
+- 표지 제목에 대괄호를 쓰면 그 부분이 강조됩니다. 한 군데만.
+
 제목과 summary 는 카드에 크게 박히는 글자입니다. 말투 규칙을 적용하지 말고
 짧고 단단하게 쓰세요. caption 에만 아래 말투를 적용합니다.
 
@@ -59,6 +75,13 @@ TOOL = {
             "headline": {"type": "string"},
             "one_liner": {"type": "string"},
             "caption": {"type": "string"},
+            "cover_style": {"type": "string", "enum": ["plain", "number", "versus"]},
+            "cover_bg": {"type": "string", "enum": ["orange", "ink"]},
+            "kicker": {"type": "string", "description": "표지 맨 윗줄 작은 글씨"},
+            "cover_number": {"type": "string", "description": "number 스타일일 때 숫자만"},
+            "cover_unit": {"type": "string", "description": "number 스타일일 때 단위"},
+            "versus_left": {"type": "string", "description": "versus 스타일일 때 왼쪽"},
+            "versus_right": {"type": "string", "description": "versus 스타일일 때 오른쪽"},
             "items": {
                 "type": "array",
                 "items": {
@@ -130,11 +153,23 @@ def main() -> int:
     if len(items) < cfg["cards"]:
         raise SystemExit(f"카드 {cfg['cards']}장이 필요한데 {len(items)}장만 왔습니다.")
 
+    style = out.get("cover_style") or "plain"
+    # versus 는 양쪽이 다 있어야 성립합니다. 하나라도 비면 기본형으로 내립니다.
+    if style == "versus" and not (out.get("versus_left") and out.get("versus_right")):
+        style = "plain"
+
     data = {
         "date": None,
         "headline": out["headline"],
         "one_liner": out["one_liner"],
         "caption": out["caption"],
+        "cover_style": style,
+        "cover_bg": out.get("cover_bg") or "orange",
+        "kicker": (out.get("kicker") or "").strip(),
+        "cover_number": (out.get("cover_number") or "").strip(),
+        "cover_unit": (out.get("cover_unit") or "").strip(),
+        "versus_left": (out.get("versus_left") or "").strip(),
+        "versus_right": (out.get("versus_right") or "").strip(),
         "items": [
             {
                 "title": it["title"],
