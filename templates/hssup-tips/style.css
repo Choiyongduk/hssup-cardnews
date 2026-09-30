@@ -14,6 +14,7 @@
   --ink: #0A0A0A;
   --paper: #FFFFFF;
   --orange: #FA5500;
+  --accent: #FF2D6F;   /* 강조 단어 한 곳에만 쓰는 색 */
   --muted: rgba(10, 10, 10, 0.5);
   --muted-on-dark: rgba(255, 255, 255, 0.55);
   --line: rgba(10, 10, 10, 0.12);
@@ -62,23 +63,37 @@ html, body {
 .fit-box { flex: 1; display: flex; flex-direction: column; min-height: 0; }
 
 /* ---------- 표지: 오렌지 색면 ---------- */
-.card.cover { background: var(--orange); color: var(--paper); }
+.card.cover { background: var(--ink); color: var(--paper); }
+/* 옅은 격자 — 평평한 검정보다 화면에 깊이가 생긴다 */
+.card.cover::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.045) 1px, transparent 1px);
+  background-size: 72px 72px;
+}
+.card.cover > * { position: relative; z-index: 1; }
 .card.cover .topbar,
-.card.cover .footer { color: rgba(255, 255, 255, 0.72); }
+.card.cover .footer { color: rgba(255, 255, 255, 0.6); }
 .card.cover .footer { border-top-color: var(--line-on-dark); }
 .card.cover .footer .page b { color: var(--paper); }
 .card.cover .topbar .logo { filter: brightness(0) invert(1); }
 
 .kicker {
-  margin-top: 88px;
+  margin-top: 84px;
   font-size: 26px; font-weight: 800; letter-spacing: 0.22em;
-  color: rgba(255, 255, 255, 0.8);
+  color: var(--orange);
 }
 
+/* 제목 위 짧은 선 하나. 시선을 제목으로 끌어준다 */
+.dash { display: block; width: 76px; height: 6px; background: var(--accent); margin: 30px 0 22px; }
+
 .headline {
-  margin-top: 26px;
   font-size: 100px; font-weight: 800; line-height: 1.04; letter-spacing: -0.035em;
 }
+
+/* 강조 단어 — 한 장에 한 군데만 */
+.hl { font-style: normal; color: var(--accent); }
 
 .index { margin-top: 64px; list-style: none; }
 .index li {
@@ -89,7 +104,7 @@ html, body {
 .index li:last-child { border-bottom: 1px solid var(--line-on-dark); }
 .index .no {
   font-size: 24px; font-weight: 800; letter-spacing: 0.08em;
-  color: rgba(255, 255, 255, 0.62); flex: none; min-width: 42px;
+  color: var(--orange); flex: none; min-width: 42px;
 }
 
 /* ---------- 본문 카드 ---------- */

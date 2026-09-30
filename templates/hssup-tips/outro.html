@@ -3,7 +3,7 @@
 {% block content %}
 <section class="fit-box" data-name="outro">
   <p class="label">정리하면</p>
-  <h1 class="one-liner" data-fit="48">{{ data.one_liner }}</h1>
+  <h1 class="one-liner" data-fit="48">{{ data.one_liner|hl }}</h1>
   <div class="cta">
     <h2>{{ cfg.outro.cta_title }}</h2>
     <p data-fit="24">{{ cfg.outro.cta_body }}</p>

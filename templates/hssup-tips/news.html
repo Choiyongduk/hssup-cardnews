@@ -4,7 +4,7 @@
 <span class="bignum">{{ "%02d"|format(index) }}</span>
 <section class="fit-box" data-name="news-{{ index }}">
   <span class="tag">STEP {{ "%02d"|format(index) }}</span>
-  <h1 class="title" data-fit="46">{{ item.title }}</h1>
+  <h1 class="title" data-fit="46">{{ item.title|hl }}</h1>
   <ul class="summary">
     {% for line in item.summary %}<li data-fit="28">{{ line }}</li>{% endfor %}
   </ul>

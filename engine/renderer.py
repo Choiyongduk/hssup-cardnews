@@ -36,6 +36,25 @@ FIT_SCRIPT = """
 """
 
 
+
+def _highlight(text: str) -> "Markup":
+    """대괄호로 묶은 부분을 강조색으로 칠합니다.
+
+    "해외에서 [난리난] 카드뉴스" 처럼 씁니다. 한 장에 한 군데만 칠해야
+    눈이 그리로 갑니다. 글자는 그대로 두고 색만 바꿉니다.
+    """
+    from markupsafe import Markup, escape
+
+    out, rest = [], text or ""
+    while "[" in rest and "]" in rest.split("[", 1)[1]:
+        before, rest = rest.split("[", 1)
+        inside, rest = rest.split("]", 1)
+        out.append(escape(before))
+        out.append(Markup('<em class="hl">') + escape(inside) + Markup("</em>"))
+    out.append(escape(rest))
+    return Markup("").join(out)
+
+
 class Renderer:
     def __init__(self, cfg: dict):
         self.cfg = cfg
@@ -46,6 +65,7 @@ class Renderer:
             loader=FileSystemLoader(str(self.tpl_dir)),
             autoescape=select_autoescape(["html"]),
         )
+        self.env.filters["hl"] = _highlight
 
     def build_pages(self, data: dict, items: list[dict]) -> list[tuple[str, str]]:
         total = len(items) + 2
