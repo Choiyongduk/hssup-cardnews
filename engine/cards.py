@@ -64,3 +64,21 @@ def redraw(cfg: dict, ref_key: str) -> tuple[list[str], list[str]]:
         stamp = dt.datetime.now(dt.timezone.utc).strftime("%H%M%S")
         urls = assets.upload_images(pngs, cfg["slug"], f"revised/{ref_key}-{stamp}")
     return urls, []
+
+
+def style_summary(cfg: dict) -> str:
+    """지금 쓰고 있는 글자 크기를 훑어 알려줍니다.
+
+    지금 값을 모르면 1.1em 처럼 상대 단위로 찍게 되는데, 기본 16px 기준으로
+    계산돼 오히려 작아집니다. 실제로 42px 이던 글자가 17px 이 된 적이 있습니다.
+    """
+    import re
+
+    css = (ROOT / "templates" / cfg["template"] / "style.css").read_text(encoding="utf-8")
+    want = [".headline", ".title", ".summary li", ".why p", ".kicker", ".one-liner", ".index li"]
+    out = []
+    for sel in want:
+        m = re.search(re.escape(sel) + r"\s*\{[^}]*?font-size:\s*(\d+)px", css, re.S)
+        if m:
+            out.append(f"  {sel} : {m.group(1)}px")
+    return chr(10).join(out)

@@ -93,7 +93,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add pending/
+          git add pending/ data/
           git diff --cached --quiet || git commit -m "chore: apply post revisions [skip ci]"
           git pull --rebase origin master
           git push

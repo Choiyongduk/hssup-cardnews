@@ -87,7 +87,14 @@ CARDS_NOTE = """글에서 그려낸 카드뉴스입니다. 원본 사진이 없�
   기본 스타일 뒤에 덧붙습니다. 바꿀 수 있는 값: --accent(강조색), --orange, --ink, --paper
   주요 선택자: .headline(표지 제목) .title(카드 제목) .summary li(설명 줄)
   .why p(요점) .kicker .index li .hl(강조 단어) .card.cover .card.outro
-  글자가 배경과 비슷해지거나 카드 밖으로 나가면 자동으로 되돌아갑니다. 과감하게 쓰세요.
+
+  지금 글자 크기:
+{sizes}
+
+  **글자 크기는 반드시 px 로 적으세요.** em, %, rem 을 쓰면 기본 16px 기준으로
+  계산돼 오히려 작아집니다. "10% 키워달라" 는 42px 을 46px 로 적으라는 뜻입니다.
+  글자가 배경과 비슷해지거나, 카드 밖으로 나가거나, 24px 아래로 작아지면
+  자동으로 되돌아갑니다. 그 안에서는 과감하게 쓰세요.
 - 카드에 담긴 글을 바꾸려면 `cards` 에 고칠 카드만 적으세요.
 - 제목에 대괄호를 쓰면 그 부분이 강조색으로 칠해집니다. 한 장에 한 군데만."""
 
@@ -278,6 +285,15 @@ def _ask(client, model: str, row: dict, msg: dict) -> dict:
         messages.append({"role": "user", "content": msg["body"]})
 
     cards = _is_cards(row)
+    kind_note = PHOTO_NOTE
+    if cards:
+        from engine.cards import style_summary
+
+        try:
+            kind_note = CARDS_NOTE.format(sizes=style_summary(load_channel(row["channel"])))
+        except Exception:
+            kind_note = CARDS_NOTE.replace("{sizes}", "  (읽지 못했습니다)")
+
     resp = client.messages.create(
         model=model,
         max_tokens=4000,
@@ -285,7 +301,7 @@ def _ask(client, model: str, row: dict, msg: dict) -> dict:
             roster=staff.roster_text(),
             voice_note="\n".join(f"  {v['name']} 팀장: {v['voice']}" for v in staff.STAFF.values()),
             kind_label="카드뉴스" if cards else "사진 게시물",
-            kind_note=CARDS_NOTE if cards else PHOTO_NOTE,
+            kind_note=kind_note,
             voice=HSSUP_VOICE,
             caption=row.get("body") or "",
         ),

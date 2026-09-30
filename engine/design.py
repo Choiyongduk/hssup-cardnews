@@ -78,7 +78,19 @@ CHECK_SCRIPT = """
     if (ratio < 3) problems.push('색이 비슷해 안 읽힘: "' + text.slice(0, 20) + '"');
   });
 
-  // 4) 카드가 통째로 비었는가
+  // 4) 글자가 너무 작아졌는가
+  // 1080px 짜리 카드에서 24px 아래로 내려가면 폰에서 안 읽힌다.
+  // "키워달라" 고 했는데 상대 단위를 잘못 써서 작아지는 일이 있었다.
+  document.querySelectorAll('.title, .summary li, .why p, .headline, .one-liner').forEach((el) => {
+    const text = (el.textContent || '').trim();
+    if (!text) return;
+    const size = parseFloat(getComputedStyle(el).fontSize);
+    if (size && size < 24) {
+      problems.push('글자가 너무 작음 (' + Math.round(size) + 'px): "' + text.slice(0, 16) + '"');
+    }
+  });
+
+  // 5) 카드가 통째로 비었는가
   const shown = [...document.querySelectorAll('h1, h2, p, li')]
     .filter((el) => (el.textContent || '').trim() && el.getBoundingClientRect().height > 0);
   if (shown.length < 2) problems.push('카드가 비어 있음');
