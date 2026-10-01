@@ -30,6 +30,19 @@ jobs:
       - name: Install dependencies
         run: pip install anthropic PyYAML python-dotenv requests
 
+      # 오늘 올리면 좋을 콘텐츠 아이디어 5개. 아침 보고보다 먼저 써서 같은 아침에 앱에 뜨게.
+      # 실패해도 아침 보고는 나가야 한다.
+      - name: Daily content ideas
+        continue-on-error: true
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}  # 있으면 구독 먼저 (engine/llm.py)
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          HSSUP_MAIN_IG_BUSINESS_ID: ${{ secrets.HSSUP_MAIN_IG_BUSINESS_ID }}
+          HSSUP_MAIN_IG_TOKEN: ${{ secrets.HSSUP_MAIN_IG_TOKEN }}
+        run: python daily_ideas.py --count 5
+
       - name: Write the morning brief
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
