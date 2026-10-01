@@ -33,7 +33,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 import requests
-from anthropic import Anthropic
+from engine import llm
 
 from engine import assets, attachments, free_design, staff, telegram, trends_sync
 from engine.config import ROOT, load_channel
@@ -517,7 +517,7 @@ def main() -> int:
         _set_output("needs_render", "false")
         return 0
 
-    client = Anthropic()
+    client = llm.client()
     model = os.environ.get("CLAUDE_MODEL", DEFAULT_MODEL)
     deferred = []
 

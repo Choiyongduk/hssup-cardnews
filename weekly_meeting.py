@@ -14,7 +14,7 @@ import datetime as dt
 import os
 import sys
 
-from anthropic import Anthropic
+from engine import llm
 
 from engine import staff, telegram, trends_sync
 from engine.config import load_channel
@@ -109,7 +109,7 @@ def gather() -> tuple[str, dict]:
 def main() -> int:
     material, _ = gather()
 
-    client = Anthropic()
+    client = llm.client()
     resp = client.messages.create(
         model=os.environ.get("LIGHT_MODEL", DEFAULT_MODEL),
         max_tokens=3000,

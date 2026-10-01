@@ -24,6 +24,7 @@ jobs:
       - name: Render hssup-news
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}  # 있으면 구독 먼저 (engine/llm.py)
           HSSUP_ACADEMY_BOT_TOKEN: ${{ secrets.HSSUP_ACADEMY_BOT_TOKEN }}
           ASSETS_REPO: ${{ secrets.ASSETS_REPO }}
           ASSETS_REPO_TOKEN: ${{ secrets.ASSETS_REPO_TOKEN }}

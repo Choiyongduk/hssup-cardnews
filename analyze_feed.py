@@ -13,7 +13,7 @@ import json
 import os
 import sys
 
-from anthropic import Anthropic
+from engine import llm
 
 from engine import feed, telegram, trends_sync
 from engine.config import ROOT, load_channel
@@ -114,7 +114,7 @@ def main() -> int:
 
     print(f"[{args.channel}] @{account.get('username')} 최근 {args.days}일 게시물 {stats['post_count']}건")
 
-    client = Anthropic()
+    client = llm.client()
     resp = client.messages.create(
         model=os.environ.get("CLAUDE_MODEL", DEFAULT_MODEL),
         max_tokens=8000,

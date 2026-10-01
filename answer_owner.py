@@ -14,7 +14,7 @@ from __future__ import annotations
 import os
 import sys
 
-from anthropic import Anthropic
+from engine import llm
 
 from engine import attachments, trends_sync
 from engine.config import ROOT  # noqa: F401  (.env 를 읽어 환경변수를 채웁니다)
@@ -101,7 +101,7 @@ def main() -> int:
         print("답할 메시지가 없습니다.")
         return 0
 
-    client = Anthropic()
+    client = llm.client()
     model = os.environ.get("CLAUDE_MODEL", DEFAULT_MODEL)
 
     for msg in pending:

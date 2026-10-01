@@ -6,7 +6,7 @@ import io
 import os
 from pathlib import Path
 
-from anthropic import Anthropic
+from . import llm
 from PIL import Image
 
 from .voice import HSSUP_VOICE
@@ -45,7 +45,7 @@ def write_post(
     model: str | None = None,
 ) -> dict:
     """이미지 1장을 보고 {"headline": ..., "caption": ...}을 작성합니다."""
-    client = Anthropic()
+    client = llm.client()
     image_bytes, media_type = _normalize_image(image_path)
     image_b64 = base64.standard_b64encode(image_bytes).decode()
 

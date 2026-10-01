@@ -14,7 +14,7 @@ import os
 import sys
 
 import yaml
-from anthropic import Anthropic
+from engine import llm
 
 from engine import feed, telegram, trends_sync
 from engine.config import ROOT
@@ -205,7 +205,7 @@ def main() -> int:
         print(f"  ! 비교군 조회 실패, 비교 없이 진행합니다: {e}")
         benchmark = {}
 
-    client = Anthropic()
+    client = llm.client()
     resp = client.messages.create(
         model=os.environ.get("CLAUDE_MODEL", DEFAULT_MODEL),
         max_tokens=8000,

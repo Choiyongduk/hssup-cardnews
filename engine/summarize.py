@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import os
 
-from anthropic import Anthropic
+from . import llm
 
 # 프롬프트로도 가끔 새는 한자 혼용(국가명 약칭 "美·中" 등, "에너지發" 등)에 대한 코드 레벨 안전망.
 _HANJA_FIXES = {
@@ -123,7 +123,7 @@ def filter_relevant(titles: list[str], topic: str, limit: int) -> list[int]:
     본문 추출(느리고 비용 드는 작업) 전에 걸러내기 위한 저비용 사전 분류입니다."""
     if not titles:
         return []
-    client = Anthropic()
+    client = llm.client()
     numbered = "\n".join(f"{i}. {t}" for i, t in enumerate(titles))
     prompt = (
         f"아래는 뉴스 제목 목록입니다. 이 중 채널 주제 '{topic}'을 핵심 소재로 직접 다루는 기사만, "
@@ -153,7 +153,7 @@ def filter_relevant(titles: list[str], topic: str, limit: int) -> list[int]:
 
 def generate(articles: list[dict], model: str | None = None, topic: str = DEFAULT_TOPIC) -> dict:
     """articles: [{"title", "url", "source_name", "body"}, ...] → 표준 카드뉴스 dict (date 제외)."""
-    client = Anthropic()
+    client = llm.client()
 
     blocks = []
     for i, a in enumerate(articles, 1):

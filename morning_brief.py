@@ -18,7 +18,7 @@ import datetime as dt
 import os
 import sys
 
-from anthropic import Anthropic
+from engine import llm
 
 from engine import staff, telegram, trends_sync
 from engine.config import ROOT, load_channel
@@ -128,7 +128,7 @@ def closing_line(facts_text: str) -> str:
     """담당자가 붙이는 마지막 한 줄. 사실에서만 끌어옵니다."""
     who = staff.get("planner")
     try:
-        client = Anthropic()
+        client = llm.client()
         resp = client.messages.create(
             model=os.environ.get("LIGHT_MODEL", DEFAULT_MODEL),
             max_tokens=300,

@@ -15,7 +15,7 @@ import json
 import os
 import sys
 
-from anthropic import Anthropic
+from engine import llm
 
 from engine import trends_sync
 from engine.config import ROOT, load_channel
@@ -243,7 +243,7 @@ def main() -> int:
     tool["input_schema"]["properties"]["cover_style"]["enum"] = allowed
     print(f"고를 수 있는 표지: {', '.join(allowed)}")
 
-    client = Anthropic()
+    client = llm.client()
     resp = client.messages.create(
         model=os.environ.get("CLAUDE_MODEL", DEFAULT_MODEL),
         max_tokens=4000,

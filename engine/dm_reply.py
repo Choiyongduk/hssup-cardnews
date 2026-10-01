@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import os
 
-from anthropic import Anthropic
+from . import llm
 
 DEFAULT_MODEL = "claude-sonnet-5"
 
@@ -20,7 +20,7 @@ SYSTEM_TEMPLATE = """당신은 {topic} 인스타그램 계정의 고객 응대 �
 
 def write_reply(incoming_text: str, topic: str, context: str = "", model: str | None = None) -> str:
     """고객이 보낸 DM 원문을 보고 답장 초안을 작성합니다."""
-    client = Anthropic()
+    client = llm.client()
     resp = client.messages.create(
         model=model or os.environ.get("CLAUDE_MODEL", DEFAULT_MODEL),
         max_tokens=512,

@@ -15,7 +15,7 @@ import json
 import os
 import sys
 
-from anthropic import Anthropic
+from engine import llm
 
 from engine import attachments, feed, telegram, trends_sync
 from engine.config import ROOT, load_channel
@@ -165,7 +165,7 @@ def main() -> int:
         payload["지난_기획안_이후_올라간_게시물"] = [brief(m, 400) for m in since_plan] or "없음"
         print(f"지난 기획안 이후 게시물 {len(since_plan)}건")
 
-    client = Anthropic()
+    client = llm.client()
     resp = client.messages.create(
         model=os.environ.get("CLAUDE_MODEL", DEFAULT_MODEL),
         max_tokens=8000,
