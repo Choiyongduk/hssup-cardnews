@@ -153,33 +153,58 @@ CHECK_SCRIPT = """
 """ % (W, H)
 
 
-def _ask(client, model: str, system: str, messages: list, want: str):
-    """도구 하나로 답하게 합니다.
+def _ask(client, model: str, system: str, content: list[dict], tool: dict) -> dict:
+    """한 번 묻고, 그 도구의 형식으로 답을 받습니다.
 
-    이 모델은 특정 도구를 강제로 쓰게 하는 옵션(tool_choice)을 받지 않습니다.
-    자동으로 두고 요청 글에서 어느 도구인지 말해 줍니다. 그래도 안 쓰면 한 번 더 부탁합니다.
-    대화는 덧붙이기만 합니다(지난 차례를 고치면 거절됨). 그래서 쓴 대화를 같이 돌려줍니다.
+    그리기와 검토는 각각 따로 묻습니다(이어지는 대화가 아님). 구독(claude -p)은 한 번에
+    한 말만 받아서, 이렇게 해야 원장님 클로드 구독으로 돌 수 있습니다. 구독이 안 되면
+    llm 이 API 로 넘깁니다.
+
+    Opus 5.5 는 API 에서 특정 도구를 강제하는 옵션을 받지 않아서, 도구를 하나만 주고
+    글로 부탁합니다. 그래도 안 쓰면 처음부터 한 번 더 묻습니다.
     """
-    for attempt in range(2):
+    ask = [*content, {"type": "text", "text": f"`{tool['name']}` 도구로 답해 주세요."}]
+    for _ in range(2):
         resp = client.messages.create(
-            model=model, max_tokens=16000, system=system, messages=messages,
-            tools=[DRAW_TOOL, REVIEW_TOOL], output_config={"effort": "high"},
-            # 그리고 보고 고치는 동안 앞부분(사진, 지시)이 매번 같다. 재사용하면 그 부분이 1/10 값이다.
-            cache_control={"type": "ephemeral"},
+            model=model, max_tokens=16000, system=system,
+            messages=[{"role": "user", "content": ask}],
+            tools=[tool], output_config={"effort": "high"},
         )
-        call = next((b for b in resp.content if b.type == "tool_use" and b.name == want), None)
+        call = next((b for b in resp.content if b.type == "tool_use" and b.name == tool["name"]), None)
         if call:
-            return resp, call, messages
+            return call.input
         if resp.stop_reason == "refusal":
             raise RuntimeError("디자인 요청을 거절당했습니다")
-        if attempt == 0:
-            messages = [*messages, {"role": "assistant", "content": resp.content},
-                        {"role": "user", "content": f"`{want}` 도구로 답해 주세요."}]
-    raise RuntimeError(f"{want} 도구로 답하지 않았습니다 (stop_reason={resp.stop_reason})")
+    raise RuntimeError(f"{tool['name']} 도구로 답하지 않았습니다 (stop_reason={resp.stop_reason})")
 
 
 def _b64_block(data: bytes, kind: str = "image/png") -> dict:
+    """그림 조각. 구독 쪽은 한 번에 10MB 까지만 받아서, 보낼 그림은 모두 JPEG 로 줄여 보낸다."""
+    try:
+        from io import BytesIO
+
+        from PIL import Image
+
+        im = Image.open(BytesIO(data)).convert("RGB")
+        im.thumbnail((1280, 1280))
+        buf = BytesIO()
+        im.save(buf, "JPEG", quality=85)
+        data, kind = buf.getvalue(), "image/jpeg"
+    except Exception:
+        pass   # 못 줄이면 원래대로
     return {"type": "image", "source": {"type": "base64", "media_type": kind, "data": base64.b64encode(data).decode()}}
+
+
+def _shrink(blocks: list[dict] | None) -> list[dict]:
+    """다른 데서 받은 그림 조각(참고 사진, 지금 시안)도 같은 크기로 줄인다."""
+    out = []
+    for b in blocks or []:
+        src = b.get("source") or {}
+        if b.get("type") == "image" and src.get("type") == "base64":
+            out.append(_b64_block(base64.b64decode(src["data"]), src.get("media_type", "image/png")))
+        else:
+            out.append(b)
+    return out
 
 
 def _wrap(html: str, fonts: list[str]) -> str:
@@ -315,14 +340,15 @@ def design(
     돌려주는 값: {"png": Path, "html", "fonts", "notes", "problems"}
     problems 가 남아 있으면 끝내 못 고친 것이다. 쓸지는 부른 쪽에서 정한다.
     """
-    from anthropic import Anthropic
+    from . import llm
 
-    client = client or Anthropic()
+    client = client or llm.client()   # 구독 먼저, 안 되면 API
     model = os.environ.get("DESIGN_MODEL", DEFAULT_MODEL)
     tmp = Path(tempfile.mkdtemp())
     photos = _download(photo_urls, tmp)
     out_path = out_path or tmp / "design.png"
 
+    references, current = _shrink(references), _shrink(current)
     content: list[dict] = []
     if references:
         content += [{"type": "text", "text": f"[참고 사진 {len(references)}장 — 이렇게 만들고 싶다고 하셨습니다]"}, *references]
@@ -342,32 +368,28 @@ def design(
         photos=", ".join(f"{{{{PHOTO_{i}}}}}" for i in range(1, len(photos) + 1)) or "없음",
         fonts=", ".join(GOOGLE_FONTS),
     )
-    content.append({"type": "text", "text": "`draw` 도구로 그려 주세요."})
-    messages = [{"role": "user", "content": content}]
-    resp, call, messages = _ask(client, model, system, messages, "draw")
-    html, fonts, notes = call.input["html"], call.input.get("fonts") or [], call.input.get("notes", "")
+    drawn = _ask(client, model, system, content, DRAW_TOOL)
+    html, fonts, notes = drawn["html"], drawn.get("fonts") or [], drawn.get("notes", "")
 
     problems = render(html, fonts, photos, out_path)
     for round_no in range(1, MAX_REVIEWS + 1):
         checks = ("기계 검사에서 걸린 것:\n- " + "\n- ".join(problems)) if problems else "기계 검사는 통과했습니다."
-        messages += [
-            {"role": "assistant", "content": resp.content},
-            {"role": "user", "content": [
-                {"type": "tool_result", "tool_use_id": call.id, "content": [
-                    _b64_block(out_path.read_bytes()),
-                    {"type": "text", "text": REVIEW.format(checks=checks)},
-                ]},
-            ]},
-        ]
-        resp, call, messages = _ask(client, model, system, messages, "review")
-        verdict = call.input.get("verdict")
-        print(f"  - 검토 {round_no}: {verdict} {call.input.get('problems', '')[:80]}")
+        # 검토도 따로 묻는다. 무엇을 보고 그렸는지(content)와 그린 HTML, 결과 그림을 같이 준다.
+        review = _ask(client, model, system, [
+            *content,
+            {"type": "text", "text": f"[당신이 그린 HTML]\n{html}"},
+            {"type": "text", "text": "[그 HTML 을 그림으로 뽑은 결과]"},
+            _b64_block(out_path.read_bytes()),
+            {"type": "text", "text": REVIEW.format(checks=checks)},
+        ], REVIEW_TOOL)
+        verdict = review.get("verdict")
+        print(f"  - 검토 {round_no}: {verdict} {(review.get('problems') or '')[:80]}")
         if verdict == "ok" and not problems:
             break
-        if call.input.get("html"):
-            html = call.input["html"]
-            fonts = call.input.get("fonts") or fonts
-            notes = call.input.get("notes") or notes
+        if review.get("html"):
+            html = review["html"]
+            fonts = review.get("fonts") or fonts
+            notes = review.get("notes") or notes
             problems = render(html, fonts, photos, out_path)
         elif verdict == "ok":
             break   # 기계 검사는 걸렸지만 고칠 HTML 을 안 줬다. 남은 문제로 넘긴다.

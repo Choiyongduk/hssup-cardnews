@@ -13,8 +13,8 @@ API 는 쓴 만큼 돈이 나갑니다. 원장님은 이미 클로드 구독을 
 구독은 원장님이 직접 클로드를 쓰는 것과 사용량 한도를 나눠 씁니다. 한도에 걸리거나
 모델이 구독에 없거나 클로드 코드가 실패하면, 그 한 번만 API 로 넘어갑니다.
 
-구독 쪽에서 안 되는 것: 도구를 주고받으며 이어가는 대화(틀 없이 그리기)와 프롬프트 캐시.
-그런 호출은 처음부터 API 로 갑니다.
+구독 쪽에서 안 되는 것: 도구 결과를 주고받으며 이어가는 대화와 프롬프트 캐시.
+그런 호출은 API 로 갑니다. 틀 없이 그리기는 그래서 그리기와 검토를 따로따로 묻습니다.
 """
 from __future__ import annotations
 
@@ -151,13 +151,18 @@ def _via_subscription(model: str, system=None, messages=None, tools=None, tool_c
             "--max-turns", "4",
         ]
         if tool:
-            cmd += ["--json-schema", json.dumps(tool["input_schema"], ensure_ascii=False)]
+            schema = json.dumps(tool["input_schema"], ensure_ascii=False)
+            # 윈도우 명령 창은 < > & | ^ % 를 특수 기호로 읽어 엉뚱한 오류를 낸다("<body>" 같은 설명).
+            # JSON 안에서는 \uXXXX 로 적어도 같은 뜻이라 미리 바꿔 둔다. 리눅스에서도 해가 없다.
+            for ch in "<>&|^%":
+                schema = schema.replace(ch, "\\u%04x" % ord(ch))
+            cmd += ["--json-schema", schema]
 
         env = {k: v for k, v in os.environ.items() if k not in ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN")}
         line = json.dumps({"type": "user", "message": {"role": "user", "content": blocks}}, ensure_ascii=False)
         try:
             proc = subprocess.run(
-                cmd, input=line + "\n", capture_output=True, text=True, encoding="utf-8",
+                cmd, input=line + "\n", capture_output=True, text=True, encoding="utf-8", errors="replace",
                 timeout=900, cwd=tmp, env=env,
             )
         except (OSError, subprocess.TimeoutExpired) as e:
@@ -165,7 +170,7 @@ def _via_subscription(model: str, system=None, messages=None, tools=None, tool_c
 
     out = _parse(proc.stdout)
     if proc.returncode != 0 or not out or out.get("is_error") or out.get("subtype", "success") != "success":
-        reason = (out or {}).get("result") or proc.stderr.strip()[-300:] or f"종료 코드 {proc.returncode}"
+        reason = (out or {}).get("result") or (proc.stderr or "").strip()[-300:] or f"종료 코드 {proc.returncode}"
         raise SubscriptionUnavailable(str(reason)[:300])
 
     if tool:
