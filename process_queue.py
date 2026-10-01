@@ -27,6 +27,34 @@ from engine.overlay import render_overlay
 from engine.video_overlay import extract_frame, render_video_overlay
 
 
+def _fit_instagram(path: Path) -> Path:
+    """인스타가 받는 비율(세로 4:5 ~ 가로 1.91:1) 안으로 맞춥니다. 자르지 않고 여백을 붙입니다.
+
+    ChatGPT 로 만든 이미지는 보통 2:3 이라 4:5 보다 길어서 인스타가 거절합니다.
+    잘라내면 글자가 잘리니, 가장자리 색으로 양옆(또는 위아래)을 채웁니다.
+    """
+    from PIL import Image
+
+    im = Image.open(path).convert("RGB")
+    w, h = im.size
+    ratio = w / h
+    if 0.8 <= ratio <= 1.91:
+        return path
+    if ratio < 0.8:      # 너무 길다 → 양옆을 채운다
+        new_w, new_h = round(h * 0.8), h
+    else:                # 너무 넓다 → 위아래를 채운다
+        new_w, new_h = w, round(w / 1.91)
+    # 가장자리 한 줄의 평균 색. 배경과 이어져 보이게.
+    edge = im.crop((0, 0, 1, h)) if ratio < 0.8 else im.crop((0, 0, w, 1))
+    color = tuple(int(c) for c in edge.resize((1, 1)).getpixel((0, 0)))
+    canvas = Image.new("RGB", (new_w, new_h), color)
+    canvas.paste(im, ((new_w - w) // 2, (new_h - h) // 2))
+    out = path.with_name(path.stem + "_fit.jpg")
+    canvas.save(out, "JPEG", quality=92)
+    print(f"  - 인스타 비율에 맞춰 여백을 붙임 ({w}x{h} → {new_w}x{new_h})")
+    return out
+
+
 def _render_style(entry: dict, slug: str, date_key: str, photo: Path, headline: str) -> Path | None:
     """올릴 때 고른 저장 디자인으로 그립니다. 못 그리면 None — 기본 틀로 넘어갑니다.
 
@@ -82,14 +110,25 @@ def _process_one(cfg: dict, token: str, chat_id: str, entry_path: Path) -> None:
         if is_video:
             caption_source_path = extract_frame(media_path, tmp_dir / f"{slug}-{date_key}_frame.jpg")
 
+        user_text = entry.get("user_caption", "")
+        if entry.get("as_is"):
+            # 사진이 아니라 글씨까지 다 들어간 완성 디자인이다. 그림 속 글을 캡션에서 되풀이하지 않게.
+            user_text = (f"{user_text}\n\n" if user_text else "") + (
+                "(이건 원장님이 직접 완성한 디자인 이미지입니다. 이미지 속 글을 그대로 옮기지 말고, "
+                "그 내용을 풀어 주는 캡션을 써 주세요. 헤드라인은 쓰이지 않습니다.)"
+            )
         post = media_caption.write_post(
-            caption_source_path, entry.get("user_caption", ""), cfg.get("topic", cfg["name"]), cfg.get("hashtags", [])
+            caption_source_path, user_text, cfg.get("topic", cfg["name"]), cfg.get("hashtags", [])
         )
         caption = post["caption"]
 
         post_paths = list(media_paths)
         overlay_cfg = cfg.get("overlay")
-        if overlay_cfg:
+        if entry.get("as_is") and not is_video:
+            # 원장님이 ChatGPT 등으로 이미 완성해 온 이미지. 글씨를 얹지 않고 비율만 맞춘다.
+            post_paths = [_fit_instagram(p) for p in media_paths]
+            print(f"  - [{slug}] 완성본 그대로 {len(post_paths)}장 (캡션만 씀)")
+        elif overlay_cfg:
             if is_video:
                 video_logo = overlay_cfg.get("logo_video") or overlay_cfg.get("logo")
                 rendered = render_video_overlay(
@@ -147,6 +186,7 @@ def _process_one(cfg: dict, token: str, chat_id: str, entry_path: Path) -> None:
                 "source_url": entry.get("media_url"),
                 "source_urls": media_urls,
                 "media_type": entry.get("media_type"),
+                "as_is": bool(entry.get("as_is")),  # 시안 대화에서 그림을 다시 그리지 않게
             },
         )
     except Exception as e:
@@ -197,6 +237,7 @@ def _drain_app_queue() -> None:
                     "storage_path": head["storage_path"],
                     "urgency": head.get("urgency") or "scheduled",
                     "style_id": head.get("style_id"),  # 올릴 때 고른 저장 디자인
+                    "as_is": bool(head.get("as_is")),  # 완성본 그대로 (글씨를 얹지 않음)
                     "queued_at": head["created_at"],
                 },
                 ensure_ascii=False,

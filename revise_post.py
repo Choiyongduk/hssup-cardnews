@@ -92,6 +92,12 @@ PHOTO_NOTE = """사진 위에 글씨를 얹은 게시물입니다.
   `save_style` 에 짧은 이름(예: 후기)을 적으세요. 앱에서 소재를 올릴 때 그 이름으로 고를 수 있습니다.
 - 영상은 다시 그릴 수 없습니다. 영상에 디자인 요청이 오면 왜 안 되는지 알려주세요."""
 
+FINISHED_NOTE = """원장님이 ChatGPT 등으로 직접 완성해서 올린 이미지입니다. 글씨까지 다 들어가 있습니다.
+- 캡션을 고치려면 `caption`
+- 그림은 고칠 수 없습니다. `headline`, `redesign` 은 비워 두세요.
+  그림을 바꾸고 싶다고 하시면, ChatGPT 에서 고친 이미지를 다시 만들어 소재 올리기로
+  올려 주시면 된다고 안내하세요."""
+
 CARDS_NOTE = """글에서 그려낸 카드뉴스입니다. 원본 사진이 없어 처음부터 다시 그립니다.
 - 캡션을 고치려면 `caption`
 - 카드의 글자 크기, 색, 굵기, 여백을 바꾸려면 `css` 에 덧씌울 CSS 를 적으세요.
@@ -308,7 +314,9 @@ def _ask(client, model: str, row: dict, msg: dict) -> dict:
 
     cards = _is_cards(row)
     kind_note = PHOTO_NOTE
-    if cards:
+    if (row.get("payload") or {}).get("as_is"):
+        kind_note = FINISHED_NOTE
+    elif cards:
         from engine.cards import style_summary
 
         try:
@@ -347,6 +355,8 @@ def _ask(client, model: str, row: dict, msg: dict) -> dict:
 
 def _needs_render(row: dict, result: dict) -> bool:
     """그림을 다시 그려야 하는 요청인지. 무거운 도구가 필요한 경우입니다."""
+    if (row.get("payload") or {}).get("as_is"):
+        return False   # 완성본은 그림을 건드리지 않는다 (FINISHED_NOTE)
     if _is_cards(row):
         return bool(result["css"] or result["cards"] or result["headline_text"])
     return bool(result["headline"] or result.get("redesign"))
