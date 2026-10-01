@@ -472,3 +472,36 @@ def create_trend(
             "is_active": True,
         },
     )
+
+
+# ── 저장한 디자인 (ai_styles) ────────────────────────────────
+# 원장님이 "앞으로 후기는 이 디자인으로" 하면 그 HTML 을 저장합니다.
+# 앱에서 소재를 올릴 때 고르면, 제목만 바꿔 같은 디자인으로 그립니다.
+
+def fetch_style(style_id: int) -> dict | None:
+    try:
+        rows = _get("ai_styles", {"select": "*", "id": f"eq.{style_id}"})
+    except Exception as e:
+        print(f"  ! 저장한 디자인 조회 실패: {e}")
+        return None
+    return rows[0] if rows else None
+
+
+def save_style(name: str, channel: str, html: str, fonts: list[str], preview_url: str | None) -> None:
+    """같은 이름이 있으면 덮어씁니다. "후기 디자인 바꿔서 다시 저장" 이 자연스럽게 되도록."""
+    url = os.environ.get("SUPABASE_URL")
+    key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+    resp = requests.post(
+        f"{url}/rest/v1/ai_styles",
+        headers={
+            "apikey": key,
+            "Authorization": f"Bearer {key}",
+            "Content-Type": "application/json",
+            "Prefer": "resolution=merge-duplicates,return=minimal",
+        },
+        params={"on_conflict": "channel,name"},
+        json={"name": name, "channel": channel, "html": html, "fonts": fonts, "preview_url": preview_url},
+        timeout=30,
+    )
+    if resp.status_code not in (200, 201, 204):
+        raise RuntimeError(f"디자인 저장 실패: {resp.status_code} {resp.text}")

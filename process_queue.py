@@ -21,10 +21,36 @@ from urllib.parse import urlparse
 import requests
 import yaml
 
-from engine import assets, media_caption, telegram, trends_sync
+from engine import assets, free_design, media_caption, telegram, trends_sync
 from engine.config import ROOT
 from engine.overlay import render_overlay
 from engine.video_overlay import extract_frame, render_video_overlay
+
+
+def _render_style(entry: dict, slug: str, date_key: str, photo: Path, headline: str) -> Path | None:
+    """올릴 때 고른 저장 디자인으로 그립니다. 못 그리면 None — 기본 틀로 넘어갑니다.
+
+    그린 HTML 은 이 게시물 몫으로 떠둡니다. 시안 대화에서 "제목 더 크게" 하면
+    기본 틀이 아니라 이 디자인 위에서 고쳐야 하기 때문입니다.
+    """
+    style_id = entry.get("style_id")
+    if not style_id:
+        return None
+    style = trends_sync.fetch_style(style_id)
+    if not style:
+        print(f"  ! 저장한 디자인({style_id})을 찾지 못해 기본 틀로 그립니다")
+        return None
+    out = photo.with_name(photo.stem + "_post.png")
+    try:
+        problems = free_design.apply_style(style["html"], style.get("fonts") or [], [photo], headline, out)
+    except Exception as e:
+        print(f"  ! 「{style['name']}」 디자인으로 그리지 못했습니다: {e}")
+        return None
+    if problems:
+        print(f"  ! 「{style['name']}」 디자인에 걸린 것: {problems} (그대로 씁니다)")
+    free_design.save(slug, date_key, free_design.with_headline(style["html"], headline), style.get("fonts") or [])
+    print(f"  - 「{style['name']}」 디자인으로 그림")
+    return out
 
 
 def _process_one(cfg: dict, token: str, chat_id: str, entry_path: Path) -> None:
@@ -75,14 +101,16 @@ def _process_one(cfg: dict, token: str, chat_id: str, entry_path: Path) -> None:
                     brand_color=overlay_cfg.get("brand_color", "#fa5500"),
                 )
             else:
-                rendered = render_overlay(
-                    photo_path=media_path,
-                    headline=post["headline"],
-                    out_path=media_path.with_name(media_path.stem + "_post.png"),
-                    logo_path=(ROOT / overlay_cfg["logo"]) if overlay_cfg.get("logo") else None,
-                    logo_text=overlay_cfg.get("logo_text"),
-                    brand_color=overlay_cfg.get("brand_color", "#fa5500"),
-                )
+                rendered = _render_style(entry, slug, date_key, media_path, post["headline"])
+                if not rendered:
+                    rendered = render_overlay(
+                        photo_path=media_path,
+                        headline=post["headline"],
+                        out_path=media_path.with_name(media_path.stem + "_post.png"),
+                        logo_path=(ROOT / overlay_cfg["logo"]) if overlay_cfg.get("logo") else None,
+                        logo_text=overlay_cfg.get("logo_text"),
+                        brand_color=overlay_cfg.get("brand_color", "#fa5500"),
+                    )
             # 표지에만 헤드라인을 얹는다. 뒷장은 원본 그대로 넘어간다.
             post_paths = [rendered] + media_paths[1:]
 
@@ -168,6 +196,7 @@ def _drain_app_queue() -> None:
                     "storage_paths": [r["storage_path"] for r in members],
                     "storage_path": head["storage_path"],
                     "urgency": head.get("urgency") or "scheduled",
+                    "style_id": head.get("style_id"),  # 올릴 때 고른 저장 디자인
                     "queued_at": head["created_at"],
                 },
                 ensure_ascii=False,

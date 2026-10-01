@@ -35,7 +35,7 @@ from urllib.parse import urlparse
 import requests
 from anthropic import Anthropic
 
-from engine import assets, attachments, staff, telegram, trends_sync
+from engine import assets, attachments, free_design, staff, telegram, trends_sync
 from engine.config import ROOT, load_channel
 from engine.voice import HSSUP_VOICE
 
@@ -83,9 +83,14 @@ SYSTEM = """당신은 히썹 인스타그램 계정을 맡은 팀입니다.
 
 PHOTO_NOTE = """사진 위에 글씨를 얹은 게시물입니다.
 - 캡션을 고치려면 `caption`
-- 사진 위 글씨를 바꾸려면 `headline`
-- 이 게시물은 찍은 사진이 바탕이라 글자 크기나 색은 바꿀 수 없습니다.
-  그런 요청이 오면 왜 안 되는지 알려주세요."""
+- 사진 위 글씨만 바꾸려면 `headline`
+- 디자인을 바꾸는 요청(글자 크기, 색, 배치, 라벨이나 띠 추가, 참고 사진처럼 만들어 달라는 것)은
+  디자인 담당이 틀 없이 처음부터 다시 그립니다. `staff` 를 designer 로 하고 `redesign` 에
+  무엇을 어떻게 그릴지 디자이너에게 건넬 지시를 구체적으로 적으세요. 참고 사진이 있으면
+  디자이너도 그 사진을 직접 봅니다. 제목도 바꿔야 하면 지시 안에 적으세요.
+- 원장님이 "이 디자인 저장해줘", "앞으로 후기는 이걸로" 처럼 지금 디자인을 계속 쓰고 싶어 하면
+  `save_style` 에 짧은 이름(예: 후기)을 적으세요. 앱에서 소재를 올릴 때 그 이름으로 고를 수 있습니다.
+- 영상은 다시 그릴 수 없습니다. 영상에 디자인 요청이 오면 왜 안 되는지 알려주세요."""
 
 CARDS_NOTE = """글에서 그려낸 카드뉴스입니다. 원본 사진이 없어 처음부터 다시 그립니다.
 - 캡션을 고치려면 `caption`
@@ -121,6 +126,8 @@ TOOL = {
             "headline": {"type": "string", "description": "사진 위 글씨. 카드뉴스에는 쓰지 않음."},
             "css": {"type": "string", "description": "카드 디자인에 덧씌울 CSS. 안 고치면 빈 문자열."},
             "headline_text": {"type": "string", "description": "표지 제목. 안 바꾸면 빈 문자열."},
+            "redesign": {"type": "string", "description": "사진 게시물을 틀 없이 다시 그릴 때 디자이너에게 줄 지시. 아니면 빈 문자열."},
+            "save_style": {"type": "string", "description": "지금 디자인을 저장할 이름. 아니면 빈 문자열."},
             "cards": {
                 "type": "array",
                 "description": "고칠 카드만. 안 고치면 빈 배열.",
@@ -333,6 +340,8 @@ def _ask(client, model: str, row: dict, msg: dict) -> dict:
         "css": (out.get("css") or "").strip(),
         "cards": out.get("cards") or [],
         "headline_text": _clean(out.get("headline_text")),
+        "redesign": (out.get("redesign") or "").strip(),
+        "save_style": _clean(out.get("save_style")),
     }
 
 
@@ -340,13 +349,84 @@ def _needs_render(row: dict, result: dict) -> bool:
     """그림을 다시 그려야 하는 요청인지. 무거운 도구가 필요한 경우입니다."""
     if _is_cards(row):
         return bool(result["css"] or result["cards"] or result["headline_text"])
-    return bool(result["headline"])
+    return bool(result["headline"] or result.get("redesign"))
+
+
+def _owner_photos(approval_id: int, limit: int = 4) -> list[str]:
+    """이 대화에서 원장님이 보낸 참고 사진. 최근 것부터 몇 장만."""
+    try:
+        thread = trends_sync.fetch_approval_thread(approval_id)
+    except Exception:
+        return []
+    urls = [u for t in thread if t["role"] == "owner" for u in (t.get("attachments") or [])]
+    return urls[-limit:]
+
+
+def _redesign_photo(row: dict, result: dict) -> tuple[list[str] | None, str]:
+    """사진 게시물을 틀 없이 다시 그립니다. 전에 이렇게 그렸으면 그 위에서 고칩니다."""
+    payload = row.get("payload") or {}
+    if payload.get("media_type") == "video":
+        return None, "\n\n(영상은 다시 그릴 수 없어요. 사진 게시물만 됩니다.)"
+    sources = payload.get("source_urls") or ([payload["source_url"]] if payload.get("source_url") else [])
+    if not sources:
+        return None, "\n\n(원본 사진이 없어 다시 그리지 못했어요.)"
+
+    previous = free_design.load(row["channel"], row["ref_key"])
+    previous_html, previous_fonts = free_design.strip_font_note(previous)
+
+    # 제목만 바꾸는 거면 다시 그릴 필요가 없다. 그 디자인에 글자만 갈아 끼운다.
+    if previous_html and not result.get("redesign"):
+        with tempfile.TemporaryDirectory() as tmp:
+            photo = Path(tmp) / "source.jpg"
+            photo.write_bytes(requests.get(sources[0], timeout=60).content)
+            out = Path(tmp) / "cover.png"
+            free_design.apply_style(previous_html, previous_fonts, [photo], result["headline"], out)
+            cover = assets.upload_images([out], row["channel"], f"revised/{row['ref_key']}-{os.urandom(3).hex()}")
+        if not cover:
+            return None, "\n\n(그린 그림을 올리지 못했어요.)"
+        free_design.save(row["channel"], row["ref_key"],
+                         free_design.with_headline(previous_html, result["headline"]), previous_fonts)
+        return cover + (row.get("image_urls") or [])[1:], f"\n\n(사진 위 글씨를 「{result['headline']}」 로 바꿨어요)"
+
+    request = result.get("redesign") or f"사진 위 제목을 「{result['headline']}」 로 바꿔 주세요. 나머지는 그대로 둡니다."
+    drawn = free_design.design(
+        request=request,
+        photo_urls=sources[:1],   # 디자인은 표지에만. 뒷장은 원본 그대로
+        references=attachments.image_blocks(_owner_photos(row["id"])),
+        current=attachments.image_blocks((row.get("image_urls") or [])[:1]),
+        previous_html=previous_html,
+        context=f"[지금 캡션]\n{row.get('body') or ''}",
+    )
+    if drawn["problems"]:
+        return None, f"\n\n(다시 그려봤는데 {drawn['problems'][0]} 문제가 남아 그대로 뒀어요. 다르게 말씀해 주세요.)"
+
+    cover = assets.upload_images([drawn["png"]], row["channel"], f"revised/{row['ref_key']}-{os.urandom(3).hex()}")
+    if not cover:
+        return None, "\n\n(그린 그림을 올리지 못했어요.)"
+    free_design.save(row["channel"], row["ref_key"], drawn["html"], drawn["fonts"])
+    return cover + (row.get("image_urls") or [])[1:], f"\n\n{drawn['notes']}" if drawn["notes"] else ""
+
+
+def _save_style(row: dict, name: str, image_urls: list[str] | None) -> str:
+    """지금 이 게시물의 디자인을 이름 붙여 저장합니다. 그림을 다시 그릴 일은 없습니다."""
+    saved, fonts = free_design.strip_font_note(free_design.load(row["channel"], row["ref_key"]))
+    if not saved:
+        return "\n\n(이 게시물은 기본 틀이라 저장할 디자인이 없어요. 먼저 원하시는 모양으로 다시 그린 뒤 저장해 주세요.)"
+    try:
+        preview = (image_urls or row.get("image_urls") or [None])[0]
+        trends_sync.save_style(name, row["channel"], saved, fonts, preview)
+    except Exception as e:
+        return f"\n\n(디자인을 저장하지 못했어요: {e})"
+    return f"\n\n(「{name}」 디자인으로 저장했어요. 소재 올리기에서 고르시면 됩니다.)"
 
 
 def _do_render(row: dict, result: dict) -> tuple[list[str] | None, str]:
     """그림을 다시 만듭니다. 게시물 종류에 따라 방식이 다릅니다."""
     if _is_cards(row):
         return _redraw_cards(row, result)
+
+    if result.get("redesign") or free_design.load(row["channel"], row["ref_key"]):
+        return _redesign_photo(row, result)
 
     urls = _rerender_photo(row, result["headline"])
     if urls:
@@ -378,6 +458,10 @@ def _finish(row: dict, msg_id: int, result: dict, image_urls: list[str] | None) 
         _sync_pending_file(row, caption or None, image_urls)
     except Exception as e:
         print(f"  ! 반영 실패(approval {approval_id}): {e}")
+
+    # 다시 그린 뒤에 저장해야 새 디자인이 저장된다. 그래서 반영이 끝난 여기서 한다.
+    if result.get("save_style"):
+        result["reply"] += _save_style(row, result["save_style"], image_urls)
 
     _handoff(approval_id, result["staff"])
 

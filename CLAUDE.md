@@ -47,6 +47,11 @@ cardnews는 RSS 기사를 요약해 디자인 카드(PNG)를 만드는 구조였
   전송 전 Pillow로 sRGB JPEG 정규화(색상 프로파일 문제로 Claude API가 이미지를 거부하는 것 방지).
 - `engine/overlay.py` — 사진에 로고+헤드라인을 합성해 PNG로 렌더링 (Playwright, `templates/brand-overlay/`).
   `logo`(이미지 파일 경로) 또는 `logo_text`(텍스트 로고, 이미지 없을 때 대체) 둘 중 하나 사용.
+- `engine/free_design.py` — 틀 없이 처음부터 그리는 사진 게시물 디자인. 디자인 담당(Opus)이 HTML 을 쓰고,
+  그려진 그림을 직접 보고 최대 2번 고칩니다. 제목 자리는 `data-slot="headline"`.
+  그린 HTML 은 `data/posts/<채널>-<ref>-free.html` 에 떠두고 이후 수정은 그 위에서 합니다.
+  저장한 디자인(`ai_styles`)은 `apply_style` 로 AI 없이 제목만 바꿔 그립니다.
+- `engine/attachments.py` — 원장님이 대화에 붙인 사진을 클로드에게 그림으로 넘깁니다.
 - `engine/assets.py` — 이미지를 공개 저장소(ASSETS_REPO)에 업로드해 공개 URL 확보
 - `engine/instagram.py` — Meta Graph API 게시(1장이면 단일 이미지, 2장 이상이면 캐러셀) + 장기 토큰 갱신
 - `engine/renderer.py`, `engine/theme.py`, `engine/validate.py`, `engine/caption.py`, `engine/sources.py` —
