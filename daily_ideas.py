@@ -47,7 +47,15 @@ SYSTEM = """당신은 히썹 반영구 아카데미 인스타그램의 기획 �
 
 `request` 는 디자인 담당에게 그대로 넘길 요청문입니다. 이미지에 들어갈 한글 문구(제목, 짧은 설명)와
 분위기, 색, 필요하면 배경 그림까지 구체적으로 적으세요. 카드에 박히는 글자는 존댓말로 끝내지 말고
-명사나 단정형으로 끊으세요. 찍어야 하는 아이디어도, 찍은 사진에 어떤 글을 얹을지 적어 두세요."""
+명사나 단정형으로 끊으세요. 찍어야 하는 아이디어도, 찍은 사진에 어떤 글을 얹을지 적어 두세요.
+
+[말투 — 파이팅 넘치게]
+아침에 원장님이 이걸 열었을 때 "오늘도 해보자!" 하는 기운이 나야 합니다.
+- `greeting`: 박서준 팀장의 아침 인사 두세 줄. 요일과 계절, 오늘의 분위기를 살려 힘차게.
+  느낌표 여러 개와 이모지(🔥💪✨🧡 같은 것) 두세 개를 써도 좋습니다. 원장님을 응원하세요.
+- `title`: 짧고 힘 있게. 보자마자 만들고 싶어지게.
+- `why`: 근거는 그대로 사실만, 하지만 "이거 지금 올리면 딱이에요!" 처럼 신나게 한 줄로.
+- 다만 `request` 는 디자이너에게 주는 지시라 차분하고 구체적으로 씁니다."""
 
 TOOL = {
     "name": "ideas",
@@ -55,6 +63,7 @@ TOOL = {
     "input_schema": {
         "type": "object",
         "properties": {
+            "greeting": {"type": "string", "description": "박서준 팀장의 파이팅 넘치는 아침 인사 두세 줄"},
             "ideas": {
                 "type": "array",
                 "items": {
@@ -72,7 +81,7 @@ TOOL = {
                 },
             },
         },
-        "required": ["ideas"],
+        "required": ["greeting", "ideas"],
     },
 }
 
@@ -85,10 +94,13 @@ def _one_line(s: str) -> str:
 
 def _recent_ideas(days: int = 7) -> list[str]:
     """지난 며칠 동안 낸 아이디어 제목. 같은 걸 또 내지 않게."""
-    since = (dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=days)).isoformat()
+    # 오늘 것은 뺀다. 같은 날 다시 돌리면(덮어쓰기) 오늘 낸 걸 피하느라 엉뚱해지지 않게.
+    today_start = dt.datetime.now(feed.KST).replace(hour=0, minute=0, second=0, microsecond=0)
+    since = (today_start - dt.timedelta(days=days)).isoformat()
     try:
         rows = trends_sync._get("ai_reports", {
-            "select": "body", "kind": "eq.ideas", "created_at": f"gte.{since}", "order": "created_at.desc",
+            "select": "body", "kind": "eq.ideas", "order": "created_at.desc",
+            "and": f"(created_at.gte.{since},created_at.lt.{today_start.isoformat()})",
         })
     except Exception as e:
         print(f"  ! 지난 아이디어를 읽지 못했습니다: {e}")
@@ -131,9 +143,13 @@ def _account_facts() -> dict:
         return {}
 
 
-def compose(ideas: list[dict], today: str) -> str:
-    """앱이 아이디어마다 버튼을 붙일 수 있게 정해진 모양으로 씁니다. 값은 한 줄씩."""
-    lines = [f"오늘 올리면 좋을 콘텐츠 {len(ideas)}가지입니다. 골라서 누르시면 바로 만들어요.", ""]
+def compose(ideas: list[dict], today: str, greeting: str = "") -> str:
+    """앱이 아이디어마다 버튼을 붙일 수 있게 정해진 모양으로 씁니다. 값은 한 줄씩.
+
+    첫 "## " 앞까지는 박서준 팀장의 아침 인사입니다. 앱이 맨 위에 보여줍니다.
+    """
+    opening = (greeting or "").strip() or f"오늘 올리면 좋을 콘텐츠 {len(ideas)}가지예요! 골라서 누르시면 바로 만들어요 💪"
+    lines = [opening.replace("## ", ""), ""]
     for i, it in enumerate(ideas, 1):
         lines += [
             f"## {i}. {_one_line(it['title'])}",
@@ -181,7 +197,7 @@ def main() -> int:
         print(f"아이디어가 비어 있습니다 (stop_reason={resp.stop_reason}).")
         return 1
 
-    body = compose(ideas[: args.count], today)
+    body = compose(ideas[: args.count], today, call.input.get("greeting", ""))
     if args.dry:
         print(body)
         return 0
