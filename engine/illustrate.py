@@ -32,11 +32,11 @@ def available() -> bool:
 
 def generate(prompt: str, steps: int = 8) -> bytes:
     """영어 설명으로 그림 한 장(JPEG, 1024x1024)을 그립니다. 실패하면 RuntimeError."""
-    account = os.environ["CLOUDFLARE_ACCOUNT_ID"]
+    account = os.environ["CLOUDFLARE_ACCOUNT_ID"].strip()  # 붙여넣다 딸려 온 공백, 줄바꿈 제거
     model = os.environ.get("ILLUST_MODEL", DEFAULT_MODEL)
     resp = requests.post(
         f"https://api.cloudflare.com/client/v4/accounts/{account}/ai/run/{model}",
-        headers={"Authorization": f"Bearer {os.environ['CLOUDFLARE_API_TOKEN']}"},
+        headers={"Authorization": f"Bearer {os.environ['CLOUDFLARE_API_TOKEN'].strip()}"},
         json={"prompt": prompt.strip() + NO_TEXT, "steps": steps},
         timeout=120,
     )
