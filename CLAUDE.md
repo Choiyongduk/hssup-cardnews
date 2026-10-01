@@ -31,8 +31,12 @@ cardnews는 RSS 기사를 요약해 디자인 카드(PNG)를 만드는 구조였
 5. `publish_instagram.py`가 승인된 것만 Instagram Graph API로 게시 (사진 1장이면 단일 이미지, 2장 이상이면 캐러셀)
 6. `refresh_ig_tokens.py`가 장기 토큰을 매주 자동 갱신 (약 60일 만료)
 
-**V1 제한**: 메시지당 사진 1개만 처리(여러 장 앨범은 첫 장만 반영). **영상은 아직 미지원** — 보내면
-"사진으로 보내주세요" 안내만 가고 무시됨 (프레임 추출·Reels 게시·영상 오버레이 다 별도 작업 필요, 다음 단계).
+지금은 텔레그램보다 **앱(히썹앱의 AI 오피스)** 이 주 경로입니다. 텔레그램은 나란히 살아 있고,
+앱 쪽이 검증되면 걷어냅니다. 앱에서 올리면 사진 여러 장을 한 게시물(캐러셀)로 묶고,
+영상도 받고, "바로 작업" 으로 몇 분 안에 처리할 수 있습니다.
+
+**운영 전반(담당자, 흐름, 크론 시간, 말투 규칙, 막혔을 때)은 `운영.md` 를 보세요.**
+여기는 코드 구조만 적습니다.
 
 ## 구조
 - `engine/config.py` — 채널(yaml) 로딩
@@ -46,16 +50,36 @@ cardnews는 RSS 기사를 요약해 디자인 카드(PNG)를 만드는 구조였
 - `engine/assets.py` — 이미지를 공개 저장소(ASSETS_REPO)에 업로드해 공개 URL 확보
 - `engine/instagram.py` — Meta Graph API 게시(1장이면 단일 이미지, 2장 이상이면 캐러셀) + 장기 토큰 갱신
 - `engine/renderer.py`, `engine/theme.py`, `engine/validate.py`, `engine/caption.py`, `engine/sources.py` —
-  cardnews에서 그대로 가져온 카드뉴스(다단 렌더링)용 코드. **지금 세 채널은 안 씀**.
-- `channels/hssup-academy.yaml`, `channels/hssup-artmake.yaml`, `channels/preppy-pop.yaml` — 채널 설정
+  카드뉴스(글에서 그려내는 캐러셀)용. `hssup-tips`, `hssup-news` 채널이 씁니다.
+  renderer 는 그리면서 깨진 곳을 함께 검사해 `self.problems` 에 담습니다.
+- `engine/cards.py` — 카드뉴스를 다시 그리는 일. 게시물마다 카드 내용을 `data/posts/` 에 따로 떠둡니다.
+  채널 파일 하나만 쓰면 카드뉴스가 여러 개 대기할 때 서로 섞입니다.
+- `engine/design.py` — 디자인을 고쳤을 때 깨졌는지 보는 검사기. 걸리면 되돌립니다.
+- `engine/staff.py` — 담당자 명단. 누가 어떤 요청을 맡는지. 앱의 AI_STAFF 와 같은 사람들.
+- `engine/voice.py` — 캡션 말투 기준. 실제 히썹 계정 글에서 뽑았습니다.
+- `engine/trends_sync.py` — Supabase 와 주고받는 모든 것. 앱이 보는 표들을 여기서 씁니다.
+- `channels/*.yaml` — 채널 설정. 사진 게시(`telegram_inbox`)와 카드뉴스(`json`, `rss`)가 섞여 있습니다.
 - `assets/fonts/` Pretendard, `assets/logos/` 히썹 브랜드 로고(hssup-academy.png, hssup-general.png)
 
 ## 실행
 ```
-python poll_telegram.py          # 모든 채널 봇 폴링 (승인 처리 + 새 사진을 대기열에 등록)
-python process_queue.py          # 채널마다 대기열 맨 앞 1개씩 처리 (캡션+오버레이+승인요청 전송)
+python poll_telegram.py          # 텔레그램 봇 폴링 (승인 처리 + 새 사진을 대기열에 등록)
+python process_queue.py          # 대기열에서 꺼내 처리 (--urgent 는 "바로 작업" 만)
 python publish_instagram.py      # 승인된 것만 인스타그램 게시
 python refresh_ig_tokens.py      # 장기 토큰 갱신 (FB_APP_ID/SECRET 필요)
+
+python revise_post.py            # 시안에 남긴 수정 요청 처리 (--plan-only / --apply-plan)
+python answer_owner.py           # 리포트에 남긴 피드백에 답하기
+python run_requests.py           # "지금" 으로 올린 콘텐츠 요청 처리
+
+python make_cards.py --channel hssup-tips [--report-id N] [--section N]
+python render.py --channel hssup-tips [--slot qna]     # 카드 그리기 + 승인 등록
+python apply_design.py --channel hssup-tips --css-file new.css   # 디자인 입혀보기
+
+python morning_brief.py          # 아침 보고
+python weekly_meeting.py         # 월요일 회의록
+python analyze_feed.py           # 피드 성과 분석
+python plan_content.py           # 주간 콘텐츠 기획
 ```
 
 ## 자동화 트리거 — GitHub 기본 `schedule`가 아니라 외부 크론(cron-job.org) 사용
@@ -107,7 +131,14 @@ Windows, PowerShell, VS Code, Python 3. 가상환경 `.venv` 사용 (설치 완�
 - [x] 브랜드 오버레이(로고+헤드라인 자동 합성) 구현
 - [x] 대기열 방식으로 전환 (사진 여러 장 미리 보내면 매일 저녁 8시 하나씩 자동 게시)
 - [x] GitHub Actions 스케줄 지연 문제 해결 (cron-job.org 외부 트리거 + 저장소 public 전환)
-- [ ] 실전 테스트: 세 채널 모두 대기열 → 자동 게시까지 한 바퀴 확인
-- [ ] 프루피팝 인스타그램 계정명 실제로 변경(preppypop_official → 확정 이름) 후 channels/preppy-pop.yaml 갱신
-- [x] 앱에서 사진 여러 장을 한 게시물(캐러셀)로 올리기 + "지금 바로" 즉시 처리
-- [ ] (다음 단계) 영상 지원, DM 자동 응대(수강 문의/시술 문의), 반영구 업계 최신정보 자동 업데이트
+- [x] 앱에서 사진 여러 장을 한 게시물(캐러셀)로 올리기 + "바로 작업" 즉시 처리
+- [x] 영상 지원 (프레임 추출 → 캡션, 영상 오버레이)
+- [x] AI 오피스: 피드 분석, 콘텐츠 기획, 요청 처리, 시안 대화
+- [x] 단체 채팅방 — 요청에 맞는 담당이 나오고 자기 일이 아니면 넘김
+- [x] 주제형 카드뉴스 (기획안 → 카드 내용 → 그림 → 승인까지 한 번에)
+- [x] 디자인 자유롭게 고치되 깨지면 되돌리기
+- [x] 아침 보고 + 월요일 회의록
+- [ ] **실제 게시를 한 번도 안 해봤음.** 시안은 여럿 만들었지만 게시 0건
+- [ ] 텔레그램 경로 걷어내기 (앱 쪽이 검증되면)
+- [ ] 프루피팝 인스타그램 계정명 변경 후 channels/preppy-pop.yaml 갱신
+- [~] DM 자동 응대 — 접었음. 코드는 남았지만 워크플로에서 빠졌고 인스타 기본 자동응답 사용
