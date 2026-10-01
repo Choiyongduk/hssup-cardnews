@@ -1,0 +1,48 @@
+name: Illustration Check
+
+# 새 그림(Cloudflare FLUX)이 그려지는지 손으로 점검합니다.
+# 비밀값은 다시 읽을 수 없어서, 맞게 넣었는지는 실제로 한 장 그려 봐야 압니다.
+# 앱이나 인스타에는 아무것도 올리지 않습니다. 그린 그림은 실행 기록의 Artifacts 에 남습니다.
+on:
+  workflow_dispatch:
+    inputs:
+      prompt:
+        description: "그릴 그림 (영어)"
+        required: false
+        default: "soft watercolor illustration of autumn maple leaves on a warm beige background, minimal, elegant"
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Draw one image
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          PROMPT: ${{ inputs.prompt }}
+        run: |
+          pip install --quiet requests
+          python - <<'PY'
+          import os, time
+          from engine import illustrate
+          if not illustrate.available():
+              raise SystemExit("비밀값 CLOUDFLARE_ACCOUNT_ID / CLOUDFLARE_API_TOKEN 이 비어 있습니다")
+          t = time.time()
+          data = illustrate.generate(os.environ["PROMPT"])
+          open("illust-check.jpg", "wb").write(data)
+          print(f"그림 한 장 그림: {len(data)//1024}KB, {time.time()-t:.1f}초")
+          PY
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: illust-check
+          path: illust-check.jpg
