@@ -23,7 +23,7 @@ from engine.voice import HSSUP_VOICE
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 KST = dt.timezone(dt.timedelta(hours=9))
-DEFAULT_MODEL = "claude-sonnet-5"
+DEFAULT_MODEL = "claude-haiku-4-5"  # 정리하는 일이라 가벼운 모델로 충분하다. 값이 절반
 
 SYSTEM = """당신은 히썹 인스타그램 계정을 맡은 팀입니다. 월요일 아침 회의를 합니다.
 
@@ -111,7 +111,7 @@ def main() -> int:
 
     client = Anthropic()
     resp = client.messages.create(
-        model=os.environ.get("CLAUDE_MODEL", DEFAULT_MODEL),
+        model=os.environ.get("LIGHT_MODEL", DEFAULT_MODEL),
         max_tokens=3000,
         system=SYSTEM.format(roster=staff.roster_text(), voice=HSSUP_VOICE),
         messages=[{"role": "user", "content": material}],

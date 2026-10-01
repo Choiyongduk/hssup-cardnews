@@ -27,7 +27,7 @@ from engine.voice import HSSUP_VOICE
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 KST = dt.timezone(dt.timedelta(hours=9))
-DEFAULT_MODEL = "claude-sonnet-5"
+DEFAULT_MODEL = "claude-haiku-4-5"  # 정리하는 일이라 가벼운 모델로 충분하다. 값이 절반
 
 CLOSER_SYSTEM = """당신은 히썹 인스타그램 계정을 맡은 팀의 {name} 팀장입니다.
 아침 보고 맨 끝에 붙일 **한 줄**을 씁니다.
@@ -130,7 +130,7 @@ def closing_line(facts_text: str) -> str:
     try:
         client = Anthropic()
         resp = client.messages.create(
-            model=os.environ.get("CLAUDE_MODEL", DEFAULT_MODEL),
+            model=os.environ.get("LIGHT_MODEL", DEFAULT_MODEL),
             max_tokens=300,
             system=CLOSER_SYSTEM.format(name=who["name"], voice=HSSUP_VOICE),
             messages=[{"role": "user", "content": facts_text}],

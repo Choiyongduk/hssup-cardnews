@@ -164,6 +164,8 @@ def _ask(client, model: str, system: str, messages: list, want: str):
         resp = client.messages.create(
             model=model, max_tokens=16000, system=system, messages=messages,
             tools=[DRAW_TOOL, REVIEW_TOOL], output_config={"effort": "high"},
+            # 그리고 보고 고치는 동안 앞부분(사진, 지시)이 매번 같다. 재사용하면 그 부분이 1/10 값이다.
+            cache_control={"type": "ephemeral"},
         )
         call = next((b for b in resp.content if b.type == "tool_use" and b.name == want), None)
         if call:
