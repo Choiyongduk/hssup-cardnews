@@ -378,7 +378,8 @@ def _redesign_photo(row: dict, result: dict) -> tuple[list[str] | None, str]:
     if payload.get("media_type") == "video":
         return None, "\n\n(영상은 다시 그릴 수 없어요. 사진 게시물만 됩니다.)"
     sources = payload.get("source_urls") or ([payload["source_url"]] if payload.get("source_url") else [])
-    if not sources:
+    from_text = payload.get("media_type") == "design"   # 사진 없이 글로만 만든 것
+    if not sources and not from_text:
         return None, "\n\n(원본 사진이 없어 다시 그리지 못했어요.)"
 
     previous = free_design.load(row["channel"], row["ref_key"])
@@ -387,10 +388,13 @@ def _redesign_photo(row: dict, result: dict) -> tuple[list[str] | None, str]:
     # 제목만 바꾸는 거면 다시 그릴 필요가 없다. 그 디자인에 글자만 갈아 끼운다.
     if previous_html and not result.get("redesign"):
         with tempfile.TemporaryDirectory() as tmp:
-            photo = Path(tmp) / "source.jpg"
-            photo.write_bytes(requests.get(sources[0], timeout=60).content)
+            photos = []
+            if sources:
+                photo = Path(tmp) / "source.jpg"
+                photo.write_bytes(requests.get(sources[0], timeout=60).content)
+                photos = [photo]
             out = Path(tmp) / "cover.png"
-            free_design.apply_style(previous_html, previous_fonts, [photo], result["headline"], out)
+            free_design.apply_style(previous_html, previous_fonts, photos, result["headline"], out)
             cover = assets.upload_images([out], row["channel"], f"revised/{row['ref_key']}-{os.urandom(3).hex()}")
         if not cover:
             return None, "\n\n(그린 그림을 올리지 못했어요.)"
@@ -406,6 +410,7 @@ def _redesign_photo(row: dict, result: dict) -> tuple[list[str] | None, str]:
         current=attachments.image_blocks((row.get("image_urls") or [])[:1]),
         previous_html=previous_html,
         context=f"[지금 캡션]\n{row.get('body') or ''}",
+        channel=row["channel"],
     )
     if drawn["problems"]:
         return None, f"\n\n(다시 그려봤는데 {drawn['problems'][0]} 문제가 남아 그대로 뒀어요. 다르게 말씀해 주세요.)"

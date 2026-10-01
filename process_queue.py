@@ -21,7 +21,7 @@ from urllib.parse import urlparse
 import requests
 import yaml
 
-from engine import assets, free_design, media_caption, telegram, trends_sync
+from engine import assets, attachments, free_design, media_caption, telegram, trends_sync
 from engine.config import ROOT
 from engine.overlay import render_overlay
 from engine.video_overlay import extract_frame, render_video_overlay
@@ -53,6 +53,24 @@ def _fit_instagram(path: Path) -> Path:
     canvas.save(out, "JPEG", quality=92)
     print(f"  - 인스타 비율에 맞춰 여백을 붙임 ({w}x{h} → {new_w}x{new_h})")
     return out
+
+
+def _design_from_text(entry: dict, slug: str, date_key: str, tmp_dir: Path) -> Path:
+    """사진 없이 글로만 요청한 게시물을 그립니다. 그린 HTML 은 떠둬서 시안 대화로 고칠 수 있게 합니다."""
+    refs = attachments.image_blocks(entry.get("ref_urls") or [])
+    drawn = free_design.design(
+        request=entry.get("user_caption") or "히썹 아카데미 인스타그램 게시물",
+        photo_urls=[],
+        references=refs,
+        context="원본 사진 없이 글로만 요청한 게시물입니다. 필요하면 새 그림(illustrations)을 그려 쓰세요.",
+        out_path=tmp_dir / f"{slug}-{date_key}_design.png",
+        channel=slug,
+    )
+    if drawn["problems"]:
+        print(f"  ! 디자인에 남은 문제(그대로 씁니다): {drawn['problems']}")
+    free_design.save(slug, date_key, drawn["html"], drawn["fonts"])
+    print(f"  - 글로만 요청한 디자인을 그림: {drawn['notes'][:80]}")
+    return drawn["png"]
 
 
 def _render_style(entry: dict, slug: str, date_key: str, photo: Path, headline: str) -> Path | None:
@@ -88,7 +106,9 @@ def _process_one(cfg: dict, token: str, chat_id: str, entry_path: Path) -> None:
     print(f"  - [{slug}] 대기열에서 꺼냄: {entry_path.name}")
 
     is_video = entry.get("media_type") == "video"
-    media_urls = entry.get("media_urls") or [entry["media_url"]]
+    # 사진 없이 글로만 요청한 것. 디자인 담당이 새 그림까지 그려 한 장을 만든다.
+    is_design = entry.get("media_type") == "design"
+    media_urls = [] if is_design else (entry.get("media_urls") or [entry["media_url"]])
 
     tmp_dir = ROOT / "state" / "queue_tmp"
     tmp_dir.mkdir(parents=True, exist_ok=True)
@@ -96,6 +116,8 @@ def _process_one(cfg: dict, token: str, chat_id: str, entry_path: Path) -> None:
     try:
         # 여러 장이면 첫 장이 표지다. 캡션도 오버레이도 첫 장을 기준으로 한다.
         media_paths = []
+        if is_design:
+            media_paths.append(_design_from_text(entry, slug, date_key, tmp_dir))
         for i, url in enumerate(media_urls[:10]):  # 인스타 캐러셀 최대 10장
             ext = Path(urlparse(url).path).suffix or (".mp4" if is_video else ".jpg")
             suffix = "" if i == 0 else f"-{i}"
@@ -111,7 +133,8 @@ def _process_one(cfg: dict, token: str, chat_id: str, entry_path: Path) -> None:
             caption_source_path = extract_frame(media_path, tmp_dir / f"{slug}-{date_key}_frame.jpg")
 
         user_text = entry.get("user_caption", "")
-        if entry.get("as_is"):
+        finished = entry.get("as_is") or is_design   # 글씨까지 다 들어간 그림. 위에 또 얹지 않는다
+        if finished:
             # 사진이 아니라 글씨까지 다 들어간 완성 디자인이다. 그림 속 글을 캡션에서 되풀이하지 않게.
             user_text = (f"{user_text}\n\n" if user_text else "") + (
                 "(이건 원장님이 직접 완성한 디자인 이미지입니다. 이미지 속 글을 그대로 옮기지 말고, "
@@ -124,7 +147,7 @@ def _process_one(cfg: dict, token: str, chat_id: str, entry_path: Path) -> None:
 
         post_paths = list(media_paths)
         overlay_cfg = cfg.get("overlay")
-        if entry.get("as_is") and not is_video:
+        if finished and not is_video:
             # 원장님이 ChatGPT 등으로 이미 완성해 온 이미지. 글씨를 얹지 않고 비율만 맞춘다.
             post_paths = [_fit_instagram(p) for p in media_paths]
             print(f"  - [{slug}] 완성본 그대로 {len(post_paths)}장 (캡션만 씀)")
@@ -227,17 +250,18 @@ def _drain_app_queue() -> None:
         entry_path.write_text(
             json.dumps(
                 {
-                    "media_urls": [r["media_url"] for r in members],
+                    "media_urls": [r["media_url"] for r in members if r.get("media_url")],
                     "media_url": head["media_url"],  # 예전 형식과의 호환
                     "media_type": head["media_type"],
                     "user_caption": caption,
                     "message_id": f"app{head['id']}",
                     "app_queue_id": head["id"],
-                    "storage_paths": [r["storage_path"] for r in members],
+                    "storage_paths": [r["storage_path"] for r in members if r.get("storage_path")],
                     "storage_path": head["storage_path"],
                     "urgency": head.get("urgency") or "scheduled",
                     "style_id": head.get("style_id"),  # 올릴 때 고른 저장 디자인
                     "as_is": bool(head.get("as_is")),  # 완성본 그대로 (글씨를 얹지 않음)
+                    "ref_urls": head.get("ref_urls") or [],  # 사진 없이 만들 때 붙인 참고 사진
                     "queued_at": head["created_at"],
                 },
                 ensure_ascii=False,

@@ -25,6 +25,7 @@ from pathlib import Path
 
 import requests
 
+from . import illustrate
 from .config import ROOT
 
 DEFAULT_MODEL = "claude-opus-5-5"   # 디자인은 품질이 전부라 가장 잘 그리는 모델을 쓴다
@@ -70,7 +71,11 @@ SYSTEM = """당신은 히썹 반영구 아카데미 인스타그램의 디자인
 - 글꼴: 기본은 Pretendard(400~800). 더 필요하면 `fonts` 에 아래 목록에서 골라 적으세요.
   {fonts}
 - 별, 화살표, 아이콘은 글자(★)로 쓰지 말고 inline SVG 로 그리세요. 글꼴에 없으면 네모로 나옵니다.
-- 바깥 주소(인터넷 이미지 등)는 불러와지지 않습니다.
+- 새 그림(일러스트, 배경, 소품 그림)이 필요하면 `illustrations` 에 영어로 설명을 적으세요. 최대 2장.
+  첫 번째는 {{{{ILLUST_1}}}}, 두 번째는 {{{{ILLUST_2}}}} 로 씁니다. 1024x1024 정사각형으로 그려지니
+  object-fit 으로 맞추세요. 그림 모델은 글자를 못 쓰니 글자는 그림에 넣지 말고 HTML 로 얹으세요.
+  화풍, 색감, 구도까지 구체적으로 쓰면 잘 나옵니다. {illust_note}
+- 그 밖의 바깥 주소(인터넷 이미지 등)는 불러와지지 않습니다.
 
 [원칙]
 - 폰에서 읽혀야 합니다. 읽으라고 넣은 글자는 28px 아래로 내리지 마세요.
@@ -108,6 +113,13 @@ DRAW_TOOL = {
             "html": {"type": "string", "description": "<body> 안에 들어갈 HTML (style 포함)"},
             "fonts": {"type": "array", "items": {"type": "string"}, "description": "추가로 쓸 구글 글꼴 이름"},
             "notes": {"type": "string", "description": "무엇을 어떻게 그렸는지 한두 줄"},
+            "illustrations": {
+                "type": "array", "maxItems": 2,
+                "description": "새로 그릴 그림. 필요 없으면 빈 배열",
+                "items": {"type": "object", "properties": {
+                    "prompt": {"type": "string", "description": "영어로 쓴 그림 설명 (화풍, 색, 구도)"}},
+                    "required": ["prompt"]},
+            },
         },
         "required": ["html", "notes"],
     },
@@ -124,6 +136,13 @@ REVIEW_TOOL = {
             "html": {"type": "string", "description": "fix 일 때 고친 전체 HTML"},
             "fonts": {"type": "array", "items": {"type": "string"}},
             "notes": {"type": "string", "description": "fix 일 때 무엇을 그렸는지 다시 한두 줄"},
+            "illustrations": {
+                "type": "array", "maxItems": 2,
+                "description": "fix 에서 그림을 새로 그려야 할 때만. 지금 그림을 그대로 쓰면 빈 배열",
+                "items": {"type": "object", "properties": {
+                    "prompt": {"type": "string", "description": "영어로 쓴 그림 설명 (화풍, 색, 구도)"}},
+                    "required": ["prompt"]},
+            },
         },
         "required": ["verdict"],
     },
@@ -272,7 +291,7 @@ def render(html: str, fonts: list[str], photos: list[Path], out_path: Path, head
         # 우리 파일과 구글 글꼴만 불러온다.
         def gate(route):
             url = route.request.url
-            if url.startswith("file:") or "fonts.googleapis.com" in url or "fonts.gstatic.com" in url:
+            if url.startswith("file:") or any(h in url for h in ALLOWED_HOSTS):
                 route.continue_()
             else:
                 route.abort()
@@ -287,6 +306,43 @@ def render(html: str, fonts: list[str], photos: list[Path], out_path: Path, head
         browser.close()
     html_path.unlink(missing_ok=True)
     return problems
+
+
+# 그려 둔 HTML 이 불러와도 되는 바깥 주소. 구글 글꼴, 그리고 새로 그린 그림을 올려 둔 에셋 저장소.
+ALLOWED_HOSTS = ("fonts.googleapis.com", "fonts.gstatic.com", "raw.githubusercontent.com")
+
+
+def _illustrate(html: str, items: list[dict] | None, channel: str, folder: Path) -> tuple[str, list[str]]:
+    """디자인이 부탁한 새 그림을 그려 {{ILLUST_n}} 자리에 넣습니다.
+
+    그린 그림은 에셋 저장소에 올려 그 주소를 넣습니다. 그래야 디자인을 떠두거나
+    저장해서 나중에 다시 그려도 그림이 남아 있습니다. 못 그리면 자리를 비우고
+    그 사실을 검토 단계에 알립니다(검토가 그림 없이도 되게 고친다).
+    """
+    missing = []
+    for i, item in enumerate((items or [])[:2], 1):
+        slot = "{{ILLUST_%d}}" % i
+        if slot not in html:
+            continue
+        try:
+            if not illustrate.available():
+                raise RuntimeError("그림 서버가 연결되지 않았습니다")
+            path = folder / f"illust{i}.jpg"
+            path.write_bytes(illustrate.generate(item["prompt"]))
+            print(f"  - 새 그림 {i}: {item['prompt'][:60]}")
+            url = path.resolve().as_uri()
+            try:
+                from . import assets
+
+                url = assets.upload_images([path], channel, f"illust/{os.urandom(4).hex()}")[0]
+            except Exception as e:
+                print(f"  ! 새 그림을 저장소에 올리지 못해 이번 그리기에만 씁니다: {e}")
+            html = html.replace(slot, url)
+        except Exception as e:
+            print(f"  ! 새 그림 {i} 실패: {e}")
+            html = html.replace(slot, "")
+            missing.append(f"새 그림 {i}을 그리지 못해 빈자리로 남았습니다. 그림 없이도 보기 좋게 고쳐 주세요")
+    return html, missing
 
 
 def _download(urls: list[str], folder: Path) -> list[Path]:
@@ -330,6 +386,7 @@ def design(
     context: str = "",
     out_path: Path | None = None,
     client=None,
+    channel: str = "hssup-academy",
 ) -> dict:
     """한 장을 그립니다.
 
@@ -366,12 +423,14 @@ def design(
 
     system = SYSTEM.format(
         photos=", ".join(f"{{{{PHOTO_{i}}}}}" for i in range(1, len(photos) + 1)) or "없음",
+        illust_note="" if illustrate.available() else "(지금은 그림 서버가 연결되지 않아 새 그림을 쓸 수 없습니다. 비워 두세요.)",
         fonts=", ".join(GOOGLE_FONTS),
     )
     drawn = _ask(client, model, system, content, DRAW_TOOL)
     html, fonts, notes = drawn["html"], drawn.get("fonts") or [], drawn.get("notes", "")
+    html, missing = _illustrate(html, drawn.get("illustrations"), channel, tmp)
 
-    problems = render(html, fonts, photos, out_path)
+    problems = missing + render(html, fonts, photos, out_path)
     for round_no in range(1, MAX_REVIEWS + 1):
         checks = ("기계 검사에서 걸린 것:\n- " + "\n- ".join(problems)) if problems else "기계 검사는 통과했습니다."
         # 검토도 따로 묻는다. 무엇을 보고 그렸는지(content)와 그린 HTML, 결과 그림을 같이 준다.
@@ -390,7 +449,8 @@ def design(
             html = review["html"]
             fonts = review.get("fonts") or fonts
             notes = review.get("notes") or notes
-            problems = render(html, fonts, photos, out_path)
+            html, missing = _illustrate(html, review.get("illustrations"), channel, tmp)
+            problems = missing + render(html, fonts, photos, out_path)
         elif verdict == "ok":
             break   # 기계 검사는 걸렸지만 고칠 HTML 을 안 줬다. 남은 문제로 넘긴다.
 
