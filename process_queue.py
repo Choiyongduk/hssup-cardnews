@@ -104,6 +104,7 @@ def _process_one(cfg: dict, token: str, chat_id: str, entry_path: Path) -> None:
     entry = json.loads(entry_path.read_text(encoding="utf-8"))
     date_key = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%d-%H%M%S")
     print(f"  - [{slug}] 대기열에서 꺼냄: {entry_path.name}")
+    _mark(entry, "working")   # 실패했다 다시 시도하는 것도 "만드는 중" 으로
 
     is_video = entry.get("media_type") == "video"
     # 사진 없이 글로만 요청한 것. 디자인 담당이 새 그림까지 그려 한 장을 만든다.
@@ -179,6 +180,12 @@ def _process_one(cfg: dict, token: str, chat_id: str, entry_path: Path) -> None:
         post_urls = assets.upload_images(post_paths, slug, date_key)
     except Exception as e:
         print(f"  ! [{slug}] 처리 실패: {e}")
+        # 앱에서 "실패" 와 이유가 보이게. 앱에서 올린 건 파일 대기열에서 빼 둔다.
+        # 앱의 "다시 맡기기" 가 상태를 queued 로 돌리면 새로 옮겨 와 처음부터 한다(두 번 들어가지 않게).
+        # 텔레그램으로 온 건 예전처럼 남겨 두고 다음 차례에 다시 시도한다.
+        _mark(entry, "failed", str(e)[:300])
+        if _queue_ids(entry):
+            entry_path.unlink(missing_ok=True)
         try:
             telegram.notify(token, chat_id, f"❌ [{cfg['name']}] 대기열 처리 중 오류: {e}")
         except Exception:
@@ -210,20 +217,44 @@ def _process_one(cfg: dict, token: str, chat_id: str, entry_path: Path) -> None:
                 "source_urls": media_urls,
                 "media_type": entry.get("media_type"),
                 "as_is": bool(entry.get("as_is")),  # 시안 대화에서 그림을 다시 그리지 않게
+                "app_queue_ids": _queue_ids(entry),  # 앱에서 "시안 나옴" 을 짝지을 때
             },
         )
     except Exception as e:
         print(f"  ! [{slug}] 앱 승인 등록 실패: {e}")
 
+    _mark(entry, "done")
     entry_path.unlink()
     print(f"  - [{slug}] {date_key} 미리보기 전송 완료, 대기열에서 제거")
 
 
-def _drain_app_queue() -> None:
-    """앱에서 올린 소재를 파일 대기열로 옮깁니다.
+def _queue_ids(entry: dict) -> list[int]:
+    return entry.get("app_queue_ids") or ([entry["app_queue_id"]] if entry.get("app_queue_id") else [])
 
-    여기서 형식을 맞춰두면 텔레그램으로 온 것과 똑같이 처리됩니다.
-    Supabase 원본은 오버레이를 입혀 에셋 저장소에 올린 뒤 지웁니다 — 남겨두면 용량만 찹니다.
+
+def _mark(entry: dict, status: str, error: str | None = None) -> None:
+    """앱 대기열에 지금 상태를 적습니다. 원장님이 앱에서 "어디까지 됐나" 를 보는 근거입니다.
+
+      queued  아직 차례가 안 옴 (정해진 시간 / 곧 시작)
+      working 지금 만드는 중
+      done    시안이 올라감
+      failed  실패. error 에 이유
+    """
+    for row_id in _queue_ids(entry):
+        try:
+            trends_sync.update_media_queue(row_id, status, error)
+        except Exception as e:
+            print(f"  ! 앱 대기열 상태 갱신 실패(id {row_id}): {e}")
+
+
+def _drain_app_queue(urgent_only: bool = False) -> None:
+    """앱에서 올린 소재 중 **지금 만들 것만** 파일 대기열로 옮깁니다.
+
+    예전에는 5분마다 전부 옮기고 "끝남" 으로 적어서, 정해진 시간을 기다리는 것도 앱에
+    "만드는 중" 으로 보였습니다. 이제 앱 대기열이 진짜 상태를 갖습니다.
+      - "바로 작업" 차례(urgent_only): 바로 작업으로 올린 것만
+      - 정해진 시간 차례: 채널마다 가장 오래된 한 묶음만 (원래 한 번에 하나씩 게시)
+    그래서 정해진 시간을 기다리는 동안 "바로 작업" 으로 바꾸면 다음 5분 안에 시작됩니다.
     """
     rows = trends_sync.fetch_media_queue()
     if not rows:
@@ -235,12 +266,21 @@ def _drain_app_queue() -> None:
     for row in rows:
         groups.setdefault(row.get("group_key") or f"id{row['id']}", []).append(row)
 
+    taken: set[str] = set()   # 정해진 시간 차례에 이미 하나 꺼낸 채널
     for key, members in groups.items():
         members.sort(key=lambda r: (r.get("sort_order") or 0, r["id"]))
         head = members[0]
         slug = head["channel"]
         queue_dir = ROOT / "queue" / slug
         queue_dir.mkdir(parents=True, exist_ok=True)
+        if urgent_only:
+            if head.get("urgency") != "now":
+                continue
+        else:
+            # 파일 대기열에 이미 기다리는 게 있으면 그것부터. 새로 꺼내지 않는다.
+            if slug in taken or any(queue_dir.glob("*.json")):
+                continue
+            taken.add(slug)
         ts = dt.datetime.now(dt.timezone.utc).strftime("%Y%m%d-%H%M%S")
         entry_path = queue_dir / f"{ts}-app{head['id']}.json"
 
@@ -256,6 +296,7 @@ def _drain_app_queue() -> None:
                     "user_caption": caption,
                     "message_id": f"app{head['id']}",
                     "app_queue_id": head["id"],
+                    "app_queue_ids": [r["id"] for r in members],
                     "storage_paths": [r["storage_path"] for r in members if r.get("storage_path")],
                     "storage_path": head["storage_path"],
                     "urgency": head.get("urgency") or "scheduled",
@@ -271,7 +312,7 @@ def _drain_app_queue() -> None:
         )
         for row in members:
             try:
-                trends_sync.update_media_queue(row["id"], "done")
+                trends_sync.update_media_queue(row["id"], "working")
             except Exception as e:
                 print(f"  ! 앱 대기열 상태 갱신 실패(id {row['id']}): {e}")
         count = f"{len(members)}장" if len(members) > 1 else "1건"
@@ -328,7 +369,7 @@ def main() -> int:
     parser.add_argument("--urgent", action="store_true", help='앱에서 "지금 바로" 로 올린 것만 처리')
     args = parser.parse_args()
 
-    _drain_app_queue()
+    _drain_app_queue(urgent_only=args.urgent)
 
     for path in sorted(channels_dir.glob("*.yaml")):
         _process_channel(path, urgent_only=args.urgent)
