@@ -35,7 +35,7 @@ from urllib.parse import urlparse
 import requests
 from anthropic import Anthropic
 
-from engine import assets, staff, telegram, trends_sync
+from engine import assets, attachments, staff, telegram, trends_sync
 from engine.config import ROOT, load_channel
 from engine.voice import HSSUP_VOICE
 
@@ -67,6 +67,12 @@ SYSTEM = """당신은 히썹 인스타그램 계정을 맡은 팀입니다.
 
 무엇을 원하는지 모르겠으면 전부 비우고 `reply` 로 되물으세요.
 할 수 없는 일이면 왜 안 되는지 알려주세요. 다른 사람에게 미루지 마세요.
+
+원장님 마지막 말 앞에 **지금 올라와 있는 시안 그림**이 붙어 있습니다. 직접 보고 판단하세요.
+원장님이 **참고 사진**을 보내면 그 사진에서 무엇을 가져오고 싶은 건지 읽어내세요
+(색, 글자 크기와 굵기, 배치, 분위기, 문구). 지금 틀 안에서 바꿀 수 있는 건 바꾸고,
+틀을 새로 그려야 하는 부분(새 그림 요소, 전혀 다른 배치, 사진 자체를 바꾸는 것)은
+못 한다고 솔직히 말하세요. 무엇을 따라 했고 무엇은 못 했는지 `reply` 에 짧게 알려주세요.
 
 `reply` 에는 명사 3개 이상을 가운뎃점(·)으로 나열하지 마세요. 한자를 쓰지 마세요.
 
@@ -282,11 +288,16 @@ def _ask(client, model: str, row: dict, msg: dict) -> dict:
     """단체 채팅방에 던져진 말을 누가 맡고 어떻게 할지 정합니다."""
     thread = trends_sync.fetch_approval_thread(row["id"])
     messages = [
-        {"role": "assistant" if t["role"] == "staff" else "user", "content": t["body"]}
+        {"role": "assistant", "content": t["body"]} if t["role"] == "staff"
+        else {"role": "user", "content": attachments.owner_content(t["body"], t.get("attachments"))}
         for t in thread
     ]
     if not messages or messages[-1]["role"] != "user":
-        messages.append({"role": "user", "content": msg["body"]})
+        messages.append({"role": "user", "content": attachments.owner_content(msg["body"], msg.get("attachments"))})
+    # 글만 읽고는 "이 사진처럼" 을 비교할 수 없다. 지금 시안을 마지막 말 앞에 붙인다.
+    messages[-1]["content"] = attachments.with_images(
+        "[지금 올라와 있는 시안]", row.get("image_urls"), messages[-1]["content"], limit=10,
+    )
 
     cards = _is_cards(row)
     kind_note = PHOTO_NOTE

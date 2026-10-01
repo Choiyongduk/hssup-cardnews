@@ -16,7 +16,7 @@ import sys
 
 from anthropic import Anthropic
 
-from engine import feed, telegram, trends_sync
+from engine import attachments, feed, telegram, trends_sync
 from engine.config import ROOT, load_channel
 from engine.voice import HSSUP_VOICE
 
@@ -33,6 +33,7 @@ SYSTEM = """당신은 {name} 인스타그램 계정의 콘텐츠 기획자입니
 - 요청 내용이 성과 데이터와 어긋나도 만들어 주세요. 대신 무엇이 우려되는지 근거에 한 줄 적으세요.
 - 촬영이 현실적으로 가능한 것만 쓰세요. 이 계정은 반영구 시술과 교육을 하는 곳입니다.
 - 없는 수치를 지어내지 마세요.
+- 요청에 참고 사진이 붙어 있으면 직접 보고, 무엇을 따라 하면 되는지 촬영과 형식에 구체적으로 녹이세요.
 - 명사 3개 이상을 가운뎃점(·)으로 나열하지 마세요. 한자를 쓰지 마세요.
 
 각 기획안은 이 형식으로 쓰세요:
@@ -106,7 +107,8 @@ def main() -> int:
         model=os.environ.get("CLAUDE_MODEL", DEFAULT_MODEL),
         max_tokens=8000,
         system=SYSTEM.format(name=cfg["name"], voice=HSSUP_VOICE),
-        messages=[{"role": "user", "content": json.dumps(payload, ensure_ascii=False, indent=2)}],
+        messages=[{"role": "user", "content": attachments.requests_content(
+            json.dumps(payload, ensure_ascii=False, indent=2), pending)}],
     )
     plan = "".join(b.text for b in resp.content if b.type == "text").strip()
     if not plan:

@@ -17,7 +17,7 @@ import sys
 
 from anthropic import Anthropic
 
-from engine import feed, telegram, trends_sync
+from engine import attachments, feed, telegram, trends_sync
 from engine.config import ROOT, load_channel
 from engine.voice import HSSUP_VOICE
 
@@ -42,6 +42,7 @@ SYSTEM = """당신은 {name} 인스타그램 계정의 콘텐츠 기획자입니
 - 요청 하나당 기획 하나를 배정하고, 남는 자리를 데이터 기반 제안으로 채우세요.
 - 요청이 {count}개보다 많으면 전부 다루되, 기획 개수가 늘어나는 건 괜찮습니다.
 - 요청 내용이 성과 데이터와 어긋나도 만들어 주세요. 대신 근거에 무엇이 우려되는지 한 줄 적으세요.
+- 요청에 참고 사진이 붙어 있으면 직접 보고, 무엇을 따라 하면 되는지 촬영과 형식에 구체적으로 녹이세요.
 
 "사업 상황" 이 주어지면 **그것부터 읽고 시작하세요.** 원장님이 직접 적어둔, 숫자로는 알 수 없는 사정입니다.
 - 거기 적힌 일정이나 목표에 맞는 콘텐츠를 우선 제안하세요.
@@ -169,7 +170,8 @@ def main() -> int:
         model=os.environ.get("CLAUDE_MODEL", DEFAULT_MODEL),
         max_tokens=8000,
         system=SYSTEM.format(name=cfg["name"], count=args.count, voice=HSSUP_VOICE),
-        messages=[{"role": "user", "content": json.dumps(payload, ensure_ascii=False, indent=2)}],
+        messages=[{"role": "user", "content": attachments.requests_content(
+            json.dumps(payload, ensure_ascii=False, indent=2), pending or [])}],
     )
     plan = "".join(b.text for b in resp.content if b.type == "text").strip()
     if not plan:

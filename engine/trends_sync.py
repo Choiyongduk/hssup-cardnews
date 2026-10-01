@@ -143,12 +143,21 @@ def fetch_unanswered_messages() -> list[dict]:
     )
 
 
+def _get_thread(table: str, params: dict) -> list[dict]:
+    """대화를 사진 주소(attachments)까지 가져옵니다.
+
+    앱 쪽 db/2026-10-02_ai_attachments.sql 을 실행하기 전에는 그 칸이 없어서
+    조회가 실패합니다. 그때는 글만 가져와 예전처럼 동작하게 합니다.
+    """
+    try:
+        return _get(table, {**params, "select": "role,body,created_at,attachments"})
+    except Exception:
+        return _get(table, {**params, "select": "role,body,created_at"})
+
+
 def fetch_thread(report_id: int) -> list[dict]:
     """한 리포트에 달린 대화를 시간순으로 가져옵니다."""
-    return _get(
-        "ai_messages",
-        {"select": "role,body,created_at", "report_id": f"eq.{report_id}", "order": "created_at.asc"},
-    )
+    return _get_thread("ai_messages", {"report_id": f"eq.{report_id}", "order": "created_at.asc"})
 
 
 def create_message(report_id: int, role: str, body: str) -> None:
@@ -193,10 +202,7 @@ def fetch_unanswered_approval_messages() -> list[dict]:
 
 
 def fetch_approval_thread(approval_id: int) -> list[dict]:
-    return _get(
-        "ai_approval_messages",
-        {"select": "role,body,created_at", "approval_id": f"eq.{approval_id}", "order": "created_at.asc"},
-    )
+    return _get_thread("ai_approval_messages", {"approval_id": f"eq.{approval_id}", "order": "created_at.asc"})
 
 
 def create_approval_message(approval_id: int, role: str, body: str, staff_key: str = "") -> None:

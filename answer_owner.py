@@ -16,7 +16,7 @@ import sys
 
 from anthropic import Anthropic
 
-from engine import trends_sync
+from engine import attachments, trends_sync
 from engine.config import ROOT  # noqa: F401  (.env 를 읽어 환경변수를 채웁니다)
 from engine.voice import HSSUP_VOICE
 
@@ -47,6 +47,8 @@ SYSTEM = """당신은 히썹 반영구 아카데미의 {role}입니다.
 - 원래 형식과 구조를 유지하세요. 원래 근거로 쓴 숫자를 바꾸거나 새로 지어내지 마세요.
 - 원장님이 말한 부분만 고치고 나머지는 그대로 두세요.
 - 캡션 초안이 들어가는 경우 아래 말투를 따르세요. 근거와 설명은 차분한 보고체로 씁니다.
+
+원장님이 참고 사진을 보내면 직접 보고 무엇을 원하시는지 읽어내 반영하세요.
 
 명사 3개 이상을 가운뎃점(·)으로 나열하지 마세요. 한자를 쓰지 마세요.
 
@@ -113,11 +115,12 @@ def main() -> int:
         thread = trends_sync.fetch_thread(report_id)
 
         messages = [
-            {"role": "assistant" if t["role"] == "staff" else "user", "content": t["body"]}
+            {"role": "assistant", "content": t["body"]} if t["role"] == "staff"
+            else {"role": "user", "content": attachments.owner_content(t["body"], t.get("attachments"))}
             for t in thread
         ]
         if not messages or messages[-1]["role"] != "user":
-            messages.append({"role": "user", "content": msg["body"]})
+            messages.append({"role": "user", "content": attachments.owner_content(msg["body"], msg.get("attachments"))})
 
         try:
             resp = client.messages.create(
