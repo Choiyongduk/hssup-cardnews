@@ -13,8 +13,8 @@
 :root {
   --ink: #0A0A0A;
   --paper: #FFFFFF;
-  --orange: #FA5500;
-  --accent: #FF2D6F;   /* 강조 단어 한 곳에만 쓰는 색 */
+  --orange: #FF5C1F;
+  --accent: #FF5C1F;   /* 강조 단어 한 곳에만 쓰는 색. 원장님: 시그니처컬러는 항상 주황 */
   --muted: rgba(10, 10, 10, 0.5);
   --muted-on-dark: rgba(255, 255, 255, 0.55);
   --line: rgba(10, 10, 10, 0.12);

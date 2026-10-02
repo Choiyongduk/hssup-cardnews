@@ -217,7 +217,7 @@ def _rerender_photo(row: dict, headline: str) -> list[str] | None:
                 video_path=src, headline=headline, out_path=out,
                 logo_path=(ROOT / logo) if logo else None,
                 logo_text=overlay_cfg.get("logo_text"),
-                brand_color=overlay_cfg.get("brand_color", "#fa5500"),
+                brand_color=overlay_cfg.get("brand_color", "#ff5c1f"),
             )
         else:
             from engine.overlay import render_overlay
@@ -227,7 +227,7 @@ def _rerender_photo(row: dict, headline: str) -> list[str] | None:
                 photo_path=src, headline=headline, out_path=out,
                 logo_path=(ROOT / logo) if logo else None,
                 logo_text=overlay_cfg.get("logo_text"),
-                brand_color=overlay_cfg.get("brand_color", "#fa5500"),
+                brand_color=overlay_cfg.get("brand_color", "#ff5c1f"),
             )
 
         new_cover = assets.upload_images([out], row["channel"], f"revised/{row['ref_key']}")

@@ -28,7 +28,7 @@ instagram:
 # 보내주신 사진에 히썹 브랜드 로고+헤드라인을 자동으로 입혀서 게시 (engine/overlay.py)
 overlay:
   logo: assets/logos/hssup-general.png
-  brand_color: "#fa5500"   # HISSUP orange (브랜드 가이드 PANTONE 293C / R255 G122 B0)
+  brand_color: "#ff5c1f"   # 히썹 시그니처 주황. 앱 화면과 같은 값 (assets/brand/DESIGN.md)
 
 # DM 자동 응대 (poll_dm.py) — 받은 DM에 Claude가 답장 초안을 쓰고, 텔레그램으로 승인 요청을 보냅니다.
 dm:
