@@ -74,15 +74,18 @@ def publish_carousel(business_id: str, token: str, image_urls: list[str], captio
     return published["id"]
 
 
-def publish_video(business_id: str, token: str, video_url: str, caption: str) -> str:
+def publish_video(business_id: str, token: str, video_url: str, caption: str, thumb_offset_ms: int | None = None) -> str:
     """영상 1개를 Reels로 게시하고, 게시된 미디어 ID를 반환합니다.
-    영상 처리는 이미지보다 오래 걸려서 최대 5분까지 기다립니다."""
+    영상 처리는 이미지보다 오래 걸려서 최대 5분까지 기다립니다.
+    thumb_offset_ms: 표지로 쓸 장면(밀리초). 카드뉴스 릴스는 첫 장면이 비어 있다가 글이 떠올라서 필요하다."""
+    extra = {"thumb_offset": thumb_offset_ms} if thumb_offset_ms else {}
     container = _post(
         f"{business_id}/media",
         media_type="REELS",
         video_url=video_url,
         caption=caption,
         access_token=token,
+        **extra,
     )
     _wait_until_ready(container["id"], token, timeout=300)
     published = _post(f"{business_id}/media_publish", creation_id=container["id"], access_token=token)

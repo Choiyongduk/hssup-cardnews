@@ -29,6 +29,7 @@ W, H = 1080, 1920
 ORANGE = "#FF5C1F"   # assets/brand/DESIGN.md 의 시그니처 주황
 
 COVER, CARD, OUTRO = 3.4, 3.6, 2.8
+COVER_FRAME = 3.0   # 표지 글이 다 떠오른 때. 인스타 표지와 앱 미리보기가 이 장면을 쓴다(첫 장면은 비어 있음)
 
 
 def _hl(text: str) -> str:

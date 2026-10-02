@@ -76,7 +76,10 @@ def _publish_one(slug: str, date: str, entry_path, data: dict) -> None:
     try:
         is_video = image_urls[0].lower().endswith((".mp4", ".mov"))
         if is_video:
-            media_id = instagram.publish_video(business_id, token, image_urls[0], caption)
+            # 카드뉴스 릴스(engine/reel.py COVER_FRAME)는 표지 글이 3초쯤 다 떠오른다. 그 장면을 표지로.
+            # reel 을 import 하지 않는다. 게시 작업엔 Playwright 를 깔지 않아서.
+            offset = 3000 if str(date).endswith("-reel") else None
+            media_id = instagram.publish_video(business_id, token, image_urls[0], caption, offset)
         else:
             media_id = instagram.publish_carousel(business_id, token, image_urls, caption)
     except Exception as e:
