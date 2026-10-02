@@ -1,0 +1,47 @@
+name: Add Subtitles
+
+# 이미 올라와 있는 영상 시안에 자막을 붙입니다(engine/subtitles.py, add_subtitles.py).
+# "보기만" 이면 받아 적은 자막을 실행 기록에 보여주기만 하고 시안은 그대로 둡니다.
+# 인스타에는 올리지 않습니다. 결재는 그대로 원장님이 합니다.
+on:
+  workflow_dispatch:
+    inputs:
+      approval_id:
+        description: "영상 시안 번호"
+        required: true
+      apply:
+        description: "시안에 실제로 넣기"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  subtitles:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt faster-whisper
+          python -m playwright install --with-deps chromium
+          ffmpeg -version || sudo apt-get update && sudo apt-get install -y ffmpeg
+
+      - name: Subtitles
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          ASSETS_REPO: ${{ secrets.ASSETS_REPO }}
+          ASSETS_REPO_TOKEN: ${{ secrets.ASSETS_REPO_TOKEN }}
+          APPROVAL_ID: ${{ inputs.approval_id }}
+          APPLY: ${{ inputs.apply && '--apply' || '' }}
+        run: python add_subtitles.py "$APPROVAL_ID" $APPLY

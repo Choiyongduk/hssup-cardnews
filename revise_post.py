@@ -99,6 +99,11 @@ REEL_NOTE = """카드뉴스 내용으로 만든 릴스(움직이는 영상)입�
 
 VIDEO_NOTE = """영상 게시물입니다. 영상 위에 로고와 짧은 글씨(headline)가 얹혀 있습니다.
 지금 영상 위 글씨: 「{headline}」
+지금 자막(말소리를 받아 적은 것, 번호. 내용):
+{subtitles}
+- 자막이 틀렸거나 고쳐 달라고 하시면 `subtitles` 에 자막 줄 전부를 순서대로, 고친 줄은 고쳐서 적으세요.
+  줄 수는 그대로 두세요(시간이 줄마다 붙어 있습니다). 자막을 아예 빼 달라고 하시면 `subtitles_off` 를 true 로.
+  자막이 없는 영상에 자막을 새로 넣지는 못합니다(말소리가 없어서 비어 있는 것입니다).
 - 캡션을 고치려면 `caption`
 - 영상 위 글씨를 바꾸거나, 로고가 흐리다거나 다시 입혀 달라는 요청이면 `headline` 에 영상 위에
   얹을 글씨를 적으세요. 글씨를 안 바꾸면 지금 글씨를 그대로 적으면 됩니다. 로고와 글씨를 새로 입힙니다.
@@ -148,6 +153,9 @@ TOOL = {
             "headline_text": {"type": "string", "description": "표지 제목. 안 바꾸면 빈 문자열."},
             "redesign": {"type": "string", "description": "사진 게시물을 틀 없이 다시 그릴 때 디자이너에게 줄 지시. 아니면 빈 문자열."},
             "save_style": {"type": "string", "description": "지금 디자인을 저장할 이름. 아니면 빈 문자열."},
+            "subtitles": {"type": "array", "items": {"type": "string"},
+                          "description": "영상 자막을 고칠 때만: 자막 줄 전부(순서, 개수 그대로). 아니면 빈 배열."},
+            "subtitles_off": {"type": "boolean", "description": "영상 자막을 빼 달라고 할 때만 true"},
             "cards": {
                 "type": "array",
                 "description": "고칠 카드만. 안 고치면 빈 배열.",
@@ -190,7 +198,7 @@ def _is_cards(row: dict) -> bool:
     return (row.get("payload") or {}).get("media_type") == "carousel"
 
 
-def _rerender_photo(row: dict, headline: str) -> list[str] | None:
+def _rerender_photo(row: dict, headline: str, subtitles: list[dict] | None = None) -> list[str] | None:
     """사진 게시물: 원본을 내려받아 글씨를 다시 얹습니다."""
     payload = row.get("payload") or {}
     source_urls = payload.get("source_urls") or ([payload["source_url"]] if payload.get("source_url") else [])
@@ -223,6 +231,7 @@ def _rerender_photo(row: dict, headline: str) -> list[str] | None:
                 logo_path=(ROOT / logo) if logo else None,
                 logo_text=overlay_cfg.get("logo_text"),
                 brand_color=overlay_cfg.get("brand_color", "#ff5c1f"),
+                subtitles=subtitles,
             )
         else:
             from engine.overlay import render_overlay
@@ -334,7 +343,10 @@ def _ask(client, model: str, row: dict, msg: dict) -> dict:
     elif payload.get("media_type") == "reel":
         kind_note = REEL_NOTE
     elif payload.get("media_type") == "video":
-        kind_note = VIDEO_NOTE.format(headline=payload.get("headline") or "(기록 없음 — 영상을 보고 판단하세요)")
+        kind_note = VIDEO_NOTE.format(
+            headline=payload.get("headline") or "(기록 없음 — 영상을 보고 판단하세요)",
+            subtitles="\n".join(f"  {i}. {s['text']}" for i, s in enumerate(payload.get("subtitles") or [], 1)) or "  (없음)",
+        )
     elif cards:
         from engine.cards import style_summary
 
@@ -369,6 +381,8 @@ def _ask(client, model: str, row: dict, msg: dict) -> dict:
         "headline_text": _clean(out.get("headline_text")),
         "redesign": (out.get("redesign") or "").strip(),
         "save_style": _clean(out.get("save_style")),
+        "subtitles": [_clean(t) for t in (out.get("subtitles") or [])],
+        "subtitles_off": bool(out.get("subtitles_off")),
     }
 
 
@@ -380,7 +394,7 @@ def _needs_render(row: dict, result: dict) -> bool:
         return False   # 완성본은 그림을 건드리지 않는다 (FINISHED_NOTE)
     if _is_cards(row):
         return bool(result["css"] or result["cards"] or result["headline_text"])
-    return bool(result["headline"] or result.get("redesign"))
+    return bool(result["headline"] or result.get("redesign") or result.get("subtitles") or result.get("subtitles_off"))
 
 
 def _owner_photos(approval_id: int, limit: int = 4) -> list[str]:
@@ -486,6 +500,21 @@ def _refresh_reel(card_row: dict) -> str:
         return ""
 
 
+def _new_subtitles(payload: dict, result: dict) -> tuple[list[dict], str]:
+    """영상 자막: 빼거나, 고친 줄로 바꾸거나, 그대로. 시간은 처음 받아 적은 것을 쓴다."""
+    subs = payload.get("subtitles") or []
+    if result.get("subtitles_off"):
+        return [], ", 자막은 뺐어요" if subs else ""
+    lines = result.get("subtitles") or []
+    if lines and len(lines) == len(subs):
+        changed = sum(a["text"] != b for a, b in zip(subs, lines))
+        new = [{**s, "text": t} for s, t in zip(subs, lines) if t]
+        return new, f", 자막 {changed}줄을 고쳤어요" if changed else ""
+    if lines:
+        print(f"  ! 고친 자막 줄 수가 달라 그대로 둡니다 ({len(lines)} != {len(subs)})")
+    return subs, ""
+
+
 def _do_render(row: dict, result: dict) -> tuple[list[str] | None, str]:
     """그림을 다시 만듭니다. 게시물 종류에 따라 방식이 다릅니다."""
     if _is_cards(row):
@@ -500,10 +529,11 @@ def _do_render(row: dict, result: dict) -> tuple[list[str] | None, str]:
         headline = result.get("headline") or payload.get("headline")
         if not headline:
             return None, "\n\n(영상 위 글씨를 알 수 없어 다시 입히지 못했어요. 넣을 글씨를 말씀해 주세요.)"
-        urls = _rerender_photo(row, headline)
+        subs, sub_note = _new_subtitles(payload, result)
+        urls = _rerender_photo(row, headline, subs)
         if urls:
-            trends_sync.update_approval_payload(row["id"], {**payload, "headline": headline})
-            return urls, f"\n\n(영상에 로고와 「{headline}」 글씨를 새로 입혔어요)"
+            trends_sync.update_approval_payload(row["id"], {**payload, "headline": headline, "subtitles": subs})
+            return urls, f"\n\n(영상에 로고와 「{headline}」 글씨를 새로 입혔어요{sub_note})"
         return None, "\n\n(영상을 다시 만들지 못했어요. 원본을 찾을 수 없습니다.)"
 
     if result.get("redesign") or free_design.load(row["channel"], row["ref_key"]):

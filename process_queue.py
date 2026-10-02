@@ -148,6 +148,7 @@ def _process_one(cfg: dict, token: str, chat_id: str, entry_path: Path) -> None:
 
         post_paths = list(media_paths)
         overlay_cfg = cfg.get("overlay")
+        subs = []
         if finished and not is_video:
             # 원장님이 ChatGPT 등으로 이미 완성해 온 이미지. 글씨를 얹지 않고 비율만 맞춘다.
             post_paths = [_fit_instagram(p) for p in media_paths]
@@ -155,6 +156,10 @@ def _process_one(cfg: dict, token: str, chat_id: str, entry_path: Path) -> None:
         elif overlay_cfg:
             if is_video:
                 video_logo = overlay_cfg.get("logo_video") or overlay_cfg.get("logo")
+                # 말소리가 있으면 자막을 붙인다(engine/subtitles.py). 없거나 실패하면 빈 목록.
+                from engine import subtitles
+
+                subs = subtitles.make(media_path, hint=f"{entry.get('user_caption', '')}\n{caption}")
                 rendered = render_video_overlay(
                     video_path=media_path,
                     headline=post["headline"],
@@ -162,6 +167,7 @@ def _process_one(cfg: dict, token: str, chat_id: str, entry_path: Path) -> None:
                     logo_path=(ROOT / video_logo) if video_logo else None,
                     logo_text=overlay_cfg.get("logo_text"),
                     brand_color=overlay_cfg.get("brand_color", "#ff5c1f"),
+                    subtitles=subs,
                 )
             else:
                 rendered = _render_style(entry, slug, date_key, media_path, post["headline"])
@@ -224,6 +230,7 @@ def _process_one(cfg: dict, token: str, chat_id: str, entry_path: Path) -> None:
                 "as_is": bool(entry.get("as_is")),  # 시안 대화에서 그림을 다시 그리지 않게
                 "app_queue_ids": _queue_ids(entry),  # 앱에서 "시안 나옴" 을 짝지을 때
                 "headline": post.get("headline"),  # 로고만 다시 입힐 때 지금 글씨를 그대로 쓰려고
+                "subtitles": subs,  # 시안 대화에서 자막만 고칠 때. 영상을 다시 받아 적지 않는다
             },
         )
     except Exception as e:

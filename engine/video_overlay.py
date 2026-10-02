@@ -101,9 +101,11 @@ def render_video_overlay(
     logo_path: Path | None = None,
     logo_text: str | None = None,
     brand_color: str = "#ff5c1f",
+    subtitles: list[dict] | None = None,
 ) -> Path:
     """영상을 릴스 규격(9:16, 1080x1920)으로 맞추고 그 위에 로고+헤드라인을 입혀 out_path에 씁니다.
-    원본 비율이 9:16이 아니면 꽉 채우도록 확대 후 넘치는 부분을 잘라냅니다(레터박스 없음)."""
+    원본 비율이 9:16이 아니면 꽉 채우도록 확대 후 넘치는 부분을 잘라냅니다(레터박스 없음).
+    subtitles([{"start","end","text"}], engine/subtitles.py)가 있으면 시간에 맞춰 화면 아래에 얹습니다."""
     out_path = out_path.resolve()
     overlay_png = out_path.with_name(out_path.stem + "_overlay.png")
 
@@ -117,13 +119,24 @@ def render_video_overlay(
         brand_color=brand_color,
     )
 
+    subs = []
+    if subtitles:
+        from .subtitles import render_pngs
+
+        subs = render_pngs(subtitles, out_path.with_name(out_path.stem + "_subs"), REELS_WIDTH, REELS_HEIGHT)
+
+    inputs = ["-i", str(video_path), "-i", str(overlay_png)]
+    graph = (f"[0:v]scale={REELS_WIDTH}:{REELS_HEIGHT}:force_original_aspect_ratio=increase,"
+             f"crop={REELS_WIDTH}:{REELS_HEIGHT}[bg];[bg][1:v]overlay=0:0[v0]")
+    for i, (png, start, end) in enumerate(subs):
+        inputs += ["-i", str(png)]
+        graph += f";[v{i}][{i + 2}:v]overlay=0:0:enable='between(t,{start:.2f},{end:.2f})'[v{i + 1}]"
+
     subprocess.run(
         [
-            "ffmpeg", "-y", "-i", str(video_path), "-i", str(overlay_png),
-            "-filter_complex",
-            f"[0:v]scale={REELS_WIDTH}:{REELS_HEIGHT}:force_original_aspect_ratio=increase,"
-            f"crop={REELS_WIDTH}:{REELS_HEIGHT}[bg];[bg][1:v]overlay=0:0[outv]",
-            "-map", "[outv]", "-map", "0:a?", "-codec:a", "copy",
+            "ffmpeg", "-y", *inputs,
+            "-filter_complex", graph,
+            "-map", f"[v{len(subs)}]", "-map", "0:a?", "-codec:a", "copy",
             # 기본값(crf 23)은 로고 같은 가는 글자를 뭉갠다. 화질을 올리고, 폰에서 바로 재생되게.
             "-c:v", "libx264", "-crf", "18", "-preset", "medium", "-pix_fmt", "yuv420p", "-movflags", "+faststart",
             str(out_path),
@@ -131,4 +144,6 @@ def render_video_overlay(
         capture_output=True, check=True,
     )
     overlay_png.unlink(missing_ok=True)
+    for png, _, _ in subs:
+        png.unlink(missing_ok=True)
     return out_path
