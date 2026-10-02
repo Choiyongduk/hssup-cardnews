@@ -47,6 +47,8 @@ cardnews는 RSS 기사를 요약해 디자인 카드(PNG)를 만드는 구조였
   전송 전 Pillow로 sRGB JPEG 정규화(색상 프로파일 문제로 Claude API가 이미지를 거부하는 것 방지).
 - `engine/overlay.py` — 사진에 로고+헤드라인을 합성해 PNG로 렌더링 (Playwright, `templates/brand-overlay/`).
   `logo`(이미지 파일 경로) 또는 `logo_text`(텍스트 로고, 이미지 없을 때 대체) 둘 중 하나 사용.
+- `engine/reel.py` — 카드뉴스를 움직이는 릴스(9:16)로. 정해진 움직임 틀에 카드 내용을 넣고 seek 로 한 장씩 찍어 ffmpeg 로 잇는다.
+  render.py 가 카드뉴스 직후 "<키>-reel" 로 따로 승인 대기에 올린다. 카드 글이 바뀌면 revise_post 가 릴스도 다시 만든다.
 - `engine/free_design.py` — 틀 없이 처음부터 그리는 사진 게시물 디자인. 디자인 담당(Opus)이 HTML 을 쓰고,
   그려진 그림을 직접 보고 최대 2번 고칩니다. 제목 자리는 `data-slot="headline"`.
   그린 HTML 은 `data/posts/<채널>-<ref>-free.html` 에 떠두고 이후 수정은 그 위에서 합니다.

@@ -92,6 +92,11 @@ PHOTO_NOTE = """사진 위에 글씨를 얹은 게시물입니다.
   `save_style` 에 짧은 이름(예: 후기)을 적으세요. 앱에서 소재를 올릴 때 그 이름으로 고를 수 있습니다.
 - 영상은 다시 그릴 수 없습니다. 영상에 디자인 요청이 오면 왜 안 되는지 알려주세요."""
 
+REEL_NOTE = """카드뉴스 내용으로 만든 릴스(움직이는 영상)입니다.
+- 캡션을 고치려면 `caption`
+- 영상 속 글(제목, 설명 줄)은 여기서 바꾸지 않습니다. 같은 카드뉴스 시안에서 고쳐 달라고 하시면
+  카드뉴스를 고치면서 릴스도 같이 다시 만든다고 안내하세요. `headline`, `redesign`, `cards` 는 비워 두세요."""
+
 VIDEO_NOTE = """영상 게시물입니다. 영상 위에 로고와 짧은 글씨(headline)가 얹혀 있습니다.
 지금 영상 위 글씨: 「{headline}」
 - 캡션을 고치려면 `caption`
@@ -326,6 +331,8 @@ def _ask(client, model: str, row: dict, msg: dict) -> dict:
     payload = row.get("payload") or {}
     if payload.get("as_is"):
         kind_note = FINISHED_NOTE
+    elif payload.get("media_type") == "reel":
+        kind_note = REEL_NOTE
     elif payload.get("media_type") == "video":
         kind_note = VIDEO_NOTE.format(headline=payload.get("headline") or "(기록 없음 — 영상을 보고 판단하세요)")
     elif cards:
@@ -367,6 +374,8 @@ def _ask(client, model: str, row: dict, msg: dict) -> dict:
 
 def _needs_render(row: dict, result: dict) -> bool:
     """그림을 다시 그려야 하는 요청인지. 무거운 도구가 필요한 경우입니다."""
+    if (row.get("payload") or {}).get("media_type") == "reel":
+        return False   # 릴스의 글은 카드뉴스 쪽에서 고친다 (REEL_NOTE, _refresh_reel)
     if (row.get("payload") or {}).get("as_is"):
         return False   # 완성본은 그림을 건드리지 않는다 (FINISHED_NOTE)
     if _is_cards(row):
@@ -447,10 +456,43 @@ def _save_style(row: dict, name: str, image_urls: list[str] | None) -> str:
     return f"\n\n(「{name}」 디자인으로 저장했어요. 소재 올리기에서 고르시면 됩니다.)"
 
 
+def _refresh_reel(card_row: dict) -> str:
+    """카드뉴스 글이 바뀌면, 같은 내용으로 만든 릴스(승인 대기 중이면)도 다시 만듭니다."""
+    try:
+        reels = trends_sync._get("ai_approvals", {
+            "select": "*", "channel": f"eq.{card_row['channel']}",
+            "ref_key": f"eq.{card_row['ref_key']}-reel", "status": "eq.awaiting",
+        })
+        if not reels:
+            return ""
+        reel_row = reels[0]
+        from engine import cards as cards_mod, reel
+
+        cfg = load_channel(card_row["channel"])
+        data = cards_mod.load_cards(cfg, ref_key=card_row["ref_key"])
+        with tempfile.TemporaryDirectory() as tmp:
+            path = reel.make_reel(data, data["items"][: cfg["cards"]], cfg.get("handle", "@hssup_academy"),
+                                  Path(tmp) / "reel.mp4")
+            url = assets.upload_images([path], card_row["channel"], f"{reel_row['ref_key']}-{os.urandom(3).hex()}")[0]
+        trends_sync.update_approval_content(reel_row["id"], image_urls=[url])
+        _sync_pending_file(reel_row, None, [url])
+        trends_sync.create_approval_message(
+            reel_row["id"], "staff", "카드뉴스 글이 바뀌어서 릴스도 같은 내용으로 다시 만들었어요.",
+            staff_key="designer", attachments=_before_after(reel_row.get("image_urls"), [url]),
+        )
+        return "\n\n(같은 내용의 릴스도 다시 만들었어요)"
+    except Exception as e:
+        print(f"  ! 릴스를 다시 만들지 못했습니다: {e}")
+        return ""
+
+
 def _do_render(row: dict, result: dict) -> tuple[list[str] | None, str]:
     """그림을 다시 만듭니다. 게시물 종류에 따라 방식이 다릅니다."""
     if _is_cards(row):
-        return _redraw_cards(row, result)
+        urls, note = _redraw_cards(row, result)
+        if urls and (result.get("cards") or result.get("headline_text")):
+            note += _refresh_reel(row)
+        return urls, note
 
     payload = row.get("payload") or {}
     if payload.get("media_type") == "video":

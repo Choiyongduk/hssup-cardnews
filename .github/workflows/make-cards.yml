@@ -38,6 +38,7 @@ jobs:
         run: |
           pip install -r requirements.txt
           playwright install --with-deps chromium
+          ffmpeg -version >/dev/null 2>&1 || (sudo apt-get update && sudo apt-get install -y ffmpeg)  # 릴스(engine/reel.py)
 
       - name: Turn the plan into card content
         env:

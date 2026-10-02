@@ -73,6 +73,30 @@ def _team_review(cfg, data, items, pngs, caption, out_dir):
     return caption, fixed_pngs, fixed, fixed["items"][:n], log
 
 
+def _make_reel_draft(cfg, data, items, key, caption, out_dir) -> None:
+    """카드뉴스와 같은 내용의 릴스를 만들어 따로 승인 대기에 올립니다(engine/reel.py).
+
+    인스타에서 캐러셀과 릴스는 서로 다른 게시물이라 승인도 따로 받는다. ref_key 는 "<카드뉴스>-reel".
+    릴스의 글을 바꾸려면 카드뉴스 시안에서 고치면 된다(revise_post 가 릴스도 다시 만든다).
+    """
+    try:
+        from engine import assets, reel, trends_sync
+        from engine.telegram import create_pending
+
+        reel_key = f"{key}-reel"
+        path = reel.make_reel(data, items, cfg.get("handle", "@hssup_academy"), out_dir / "reel.mp4")
+        url = assets.upload_images([path], cfg["slug"], reel_key)[0]
+        create_pending(cfg["slug"], reel_key, [url], caption, reel_of=key)
+        trends_sync.create_approval(
+            kind="post", channel=cfg["slug"], ref_key=reel_key,
+            title=f"{cfg['name']} 릴스 승인", body=caption, image_urls=[url],
+            payload={"media_type": "reel", "cards_ref": key},
+        )
+        print(f"  릴스도 만들어 승인 대기에 올림: {url}")
+    except Exception as e:
+        print(f"  ! 릴스를 만들지 못했습니다(카드뉴스는 그대로): {e}")
+
+
 def _post_team_log(slug: str, key: str, log: list[tuple[str, str]]) -> None:
     """내부 검수에서 오간 말을 시안 대화창에 남깁니다."""
     if not log:
@@ -171,6 +195,10 @@ def main() -> int:
             _post_team_log(cfg["slug"], key, team_log)
         except Exception as e:
             print(f"  ! 앱 승인 등록 실패: {e}")
+
+        # 같은 내용으로 릴스도 하나. 실패해도 카드뉴스는 그대로 올라간다.
+        if cfg.get("reel", True):
+            _make_reel_draft(cfg, data, items, key, caption, out_dir)
     except ValueError as e:
         print(f"  ! 이미지 업로드 건너뜀: {e}")
 
