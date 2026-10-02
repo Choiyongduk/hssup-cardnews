@@ -21,7 +21,7 @@ from urllib.parse import urlparse
 import requests
 import yaml
 
-from engine import assets, attachments, free_design, media_caption, telegram, trends_sync
+from engine import assets, attachments, free_design, media_caption, team_review, telegram, trends_sync
 from engine.config import ROOT
 from engine.overlay import render_overlay
 from engine.video_overlay import extract_frame, render_video_overlay
@@ -177,6 +177,11 @@ def _process_one(cfg: dict, token: str, chat_id: str, entry_path: Path) -> None:
             # 표지에만 헤드라인을 얹는다. 뒷장은 원본 그대로 넘어간다.
             post_paths = [rendered] + media_paths[1:]
 
+        # 원장님께 올리기 전에 팀이 먼저 본다(engine/team_review.py). 검수가 실패해도 시안은 올린다.
+        team_log, caption, post_paths = _team_review(
+            entry, slug, date_key, cfg, post_paths, caption, post, media_path, caption_source_path, is_video, is_design,
+        )
+
         post_urls = assets.upload_images(post_paths, slug, date_key)
     except Exception as e:
         print(f"  ! [{slug}] 처리 실패: {e}")
@@ -224,9 +229,94 @@ def _process_one(cfg: dict, token: str, chat_id: str, entry_path: Path) -> None:
     except Exception as e:
         print(f"  ! [{slug}] 앱 승인 등록 실패: {e}")
 
+    _post_team_log(slug, date_key, team_log)
     _mark(entry, "done")
     entry_path.unlink()
     print(f"  - [{slug}] {date_key} 미리보기 전송 완료, 대기열에서 제거")
+
+
+def _team_review(entry, slug, date_key, cfg, post_paths, caption, post, media_path, frame_path, is_video, is_design):
+    """박서준(기획)과 김주훈(편집)이 먼저 보고, 고칠 게 있으면 한 바퀴만 고칩니다.
+
+    돌려주는 값: (대화 기록 [(담당, 말)], 캡션, 게시할 파일들)
+    - 캡션 문제: 김주훈이 고친 캡션으로 바꾼다
+    - 그림 문제: 틀 없이 그린 디자인이면 차은우가 그 디자인 위에서 다시 그린다.
+      기본 틀 사진이면 사진 위 글씨만 바꿔 다시 입힌다. 영상과 완성본은 그림을 건드리지 않는다
+    """
+    log: list[tuple[str, str]] = []
+    as_is = bool(entry.get("as_is"))
+    try:
+        shown = [frame_path] if is_video else post_paths[:4]
+        images = [free_design._b64_block(Path(p).read_bytes()) for p in shown]
+        kind = ("영상" if is_video else "사진 없이 만든 디자인" if is_design
+                else "완성본 이미지(글씨까지 다 들어감)" if as_is else "사진 게시물")
+        rv = team_review.review(images, caption, entry.get("user_caption", ""), kind,
+                                "" if (as_is or is_design) else post.get("headline", ""))
+    except Exception as e:
+        print(f"  ! 내부 검수를 건너뜁니다: {e}")
+        return log, caption, post_paths
+
+    planner, editor = rv["planner"], rv["editor"]
+    if planner["comment"]:
+        log.append(("planner", planner["comment"]))
+    if editor["comment"]:
+        log.append(("editor", editor["comment"]))
+    if not editor["ok"] and editor["caption"] and editor["caption"] != caption:
+        caption = editor["caption"]
+        print("  - 내부 검수: 캡션 고침")
+
+    if planner["ok"] or is_video or as_is:
+        return log, caption, post_paths
+
+    saved_html, fonts = free_design.strip_font_note(free_design.load(slug, date_key))
+    photos = [] if is_design else [media_path]
+    try:
+        if saved_html and planner["fix"]:
+            drawn = free_design.design(
+                request=planner["fix"], photo_urls=[str(p) for p in photos], references=[],
+                current=[free_design._b64_block(Path(post_paths[0]).read_bytes())],
+                previous_html=saved_html, context=f"[캡션]\n{caption}", channel=slug,
+                out_path=Path(post_paths[0]).with_name(f"{slug}-{date_key}_review.png"),
+            )
+            if drawn["problems"]:
+                log.append(("designer", "고쳐 봤는데 깨지는 데가 있어서 처음 것 그대로 둘게요."))
+            else:
+                post_paths = [drawn["png"]] + list(post_paths[1:])
+                free_design.save(slug, date_key, drawn["html"], drawn["fonts"])
+                log.append(("designer", f"말씀대로 고쳤어요. {drawn['notes']}".strip()))
+        elif planner["headline"]:
+            out = Path(post_paths[0]).with_name(f"{slug}-{date_key}_review.png")
+            if saved_html:
+                free_design.apply_style(saved_html, fonts, photos, planner["headline"], out)
+                free_design.save(slug, date_key, free_design.with_headline(saved_html, planner["headline"]), fonts)
+            else:
+                overlay_cfg = cfg.get("overlay") or {}
+                render_overlay(
+                    photo_path=media_path, headline=planner["headline"], out_path=out,
+                    logo_path=(ROOT / overlay_cfg["logo"]) if overlay_cfg.get("logo") else None,
+                    logo_text=overlay_cfg.get("logo_text"),
+                    brand_color=overlay_cfg.get("brand_color", "#fa5500"),
+                )
+            post_paths = [out] + list(post_paths[1:])
+            post["headline"] = planner["headline"]
+            log.append(("designer", f"사진 위 글씨를 「{planner['headline']}」 로 바꿔 다시 입혔어요."))
+    except Exception as e:
+        print(f"  ! 내부 검수 반영 실패(처음 것 그대로): {e}")
+    return log, caption, post_paths
+
+
+def _post_team_log(slug: str, date_key: str, log: list[tuple[str, str]]) -> None:
+    """내부 검수에서 오간 말을 시안 대화창에 남깁니다. 원장님이 무엇을 왜 고쳤는지 보게."""
+    if not log:
+        return
+    try:
+        rows = trends_sync._get("ai_approvals", {"select": "id", "channel": f"eq.{slug}", "ref_key": f"eq.{date_key}"})
+        if not rows:
+            return
+        for staff_key, body in log:
+            trends_sync.create_approval_message(rows[0]["id"], "staff", body, staff_key=staff_key)
+    except Exception as e:
+        print(f"  ! 내부 검수 대화를 남기지 못했습니다: {e}")
 
 
 def _queue_ids(entry: dict) -> list[int]:

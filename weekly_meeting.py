@@ -7,6 +7,11 @@
 
 회의록에는 결정과 맡은 사람이 남습니다. 다음 주 회의에서 지난주에 정한 걸
 지켰는지 확인합니다. 정하기만 하고 아무도 안 하는 회의가 되지 않게요.
+
+예전에는 AI 한 번이 "팀 전체인 척" 회의록을 썼습니다. 이제 진짜로 차례대로 말합니다.
+담당마다 자기 일 쪽에서 자료를 보고, 앞사람이 한 말을 듣고 받아서 말합니다.
+마지막에 박서준 팀장(기획)이 사회자로 정리해 결정과 맡을 사람을 적습니다.
+회의록에는 결정과 함께 누가 무슨 근거로 무슨 말을 했는지가 남습니다.
 """
 from __future__ import annotations
 
@@ -23,7 +28,28 @@ from engine.voice import HSSUP_VOICE
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 KST = dt.timezone(dt.timedelta(hours=9))
-DEFAULT_MODEL = "claude-haiku-4-5"  # 정리하는 일이라 가벼운 모델로 충분하다. 값이 절반
+# 서로 말을 받아 결정을 내리는 자리라 정리만 하는 모델로는 부족하다. 구독으로 돌아 추가 비용은 없다.
+DEFAULT_MODEL = "claude-sonnet-5"
+
+# 말하는 차례. 숫자를 보는 사람부터, 마지막은 사회자(기획).
+MEMBERS = [
+    ("나나", "게시", "지난주 실제로 인스타에 올라간 것과 못 올라간 것. 승인을 기다리며 쌓인 시안"),
+    ("변우석", "피드 분석", "메인 계정 성과에서 무엇이 통했고 무엇이 안 통했는지. 숫자로"),
+    ("전정국", "직원 관리", "직원 계정과 운영 흐름에서 손이 비거나 막힌 곳"),
+    ("김주훈", "콘텐츠 편집", "캡션과 사진 게시물을 만들며 원장님 수정 요청이 많았던 부분, 말투"),
+    ("차은우", "디자인", "디자인과 카드뉴스, 새로 그리기 요청에서 반응과 개선할 점"),
+    ("박서준", "콘텐츠 기획, 사회", "앞사람들 말을 받아 이번 주 무엇을 만들지 제안. 반대 의견이 있으면 조율"),
+]
+
+SPEAK = """당신은 히썹 인스타그램 팀의 {name} 팀장({role})입니다. 월요일 아침 회의에서 당신 차례입니다.
+
+당신이 보는 쪽: {focus}
+
+- 아래 자료 중 당신 일과 관련된 것을 근거로, 지난주 무엇이 있었는지와 이번 주 제안을 말하세요.
+- 앞사람이 한 말이 있으면 그 말을 받아서 말하세요. 동의하면 덧붙이고, 생각이 다르면 근거를 대고 말하세요.
+  남의 말을 되풀이만 하지는 마세요.
+- **자료에 없는 숫자나 사실을 지어내지 마세요.** 자료가 없으면 "자료가 없어 판단하기 어렵다" 고 말하세요.
+- 회의에서 말하듯 두세 문장. 존댓말. 한자를 쓰지 마세요. 명사 3개 이상을 가운뎃점(·)으로 나열하지 마세요."""
 
 SYSTEM = """당신은 히썹 인스타그램 계정을 맡은 팀입니다. 월요일 아침 회의를 합니다.
 
@@ -106,17 +132,49 @@ def gather() -> tuple[str, dict]:
     return "\n".join(parts), {"awaiting": awaiting, "published": published}
 
 
+def hold_meeting(client, model: str, material: str) -> list[tuple[str, str, str]]:
+    """차례대로 말합니다. 각자 앞사람들이 한 말을 듣고 받아서 말합니다.
+
+    돌려주는 값: [(이름, 맡은 일, 한 말)]
+    """
+    said: list[tuple[str, str, str]] = []
+    for name, role, focus in MEMBERS:
+        heard = "\n".join(f"{n} 팀장: {t}" for n, _, t in said) or "(아직 아무도 말하지 않았습니다. 당신이 처음입니다)"
+        try:
+            resp = client.messages.create(
+                model=model, max_tokens=800,
+                system=SPEAK.format(name=name, role=role, focus=focus),
+                messages=[{"role": "user", "content": f"[회의 자료]\n{material}\n\n[지금까지 회의에서 나온 말]\n{heard}\n\n{name} 팀장님 차례입니다."}],
+            )
+            text = " ".join("".join(b.text for b in resp.content if b.type == "text").split())
+        except Exception as e:
+            print(f"  ! {name} 팀장 차례를 건너뜁니다: {e}")
+            continue
+        if text:
+            said.append((name, role, text.replace("·", ", ")))
+            print(f"  - {name}: {text[:80]}")
+    return said
+
+
 def main() -> int:
     material, _ = gather()
 
     client = llm.client()
+    model = os.environ.get("MEETING_MODEL", DEFAULT_MODEL)
+    said = hold_meeting(client, model, material)
+    transcript = "\n".join(f"{n} 팀장({r}): {t}" for n, r, t in said)
+
+    # 사회자가 정리한다. 회의에서 나온 말을 근거로 결정과 맡을 사람을 적는다.
     resp = client.messages.create(
-        model=os.environ.get("LIGHT_MODEL", DEFAULT_MODEL),
+        model=model,
         max_tokens=3000,
-        system=SYSTEM.format(roster=staff.roster_text(), voice=HSSUP_VOICE),
-        messages=[{"role": "user", "content": material}],
+        system=SYSTEM.format(roster=staff.roster_text(), voice=HSSUP_VOICE)
+        + "\n\n회의는 이미 끝났습니다. [회의에서 나온 말]을 근거로 정리하세요. 말에 없는 결정을 새로 만들지 마세요.",
+        messages=[{"role": "user", "content": f"{material}\n\n[회의에서 나온 말]\n{transcript or '(기록 없음)'}"}],
     )
     body = "".join(b.text for b in resp.content if b.type == "text").strip()
+    if said:
+        body += "\n\n## 회의에서 오간 말\n" + "\n".join(f"- **{n} 팀장** ({r}) {t}" for n, r, t in said)
 
     today = dt.datetime.now(KST)
     week_no = (today.day - 1) // 7 + 1
