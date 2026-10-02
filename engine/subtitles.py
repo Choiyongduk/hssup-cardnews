@@ -42,8 +42,18 @@ def _whisper():
 
 def transcribe(video_path: Path) -> list[dict]:
     """말소리를 시간과 함께 받아 적습니다."""
-    segments, _ = _whisper().transcribe(
-        str(video_path), language="ko", vad_filter=True, beam_size=5,
+    import numpy as np
+
+    model = _whisper()
+    # 소리는 ffmpeg 로 직접 뽑아 넘긴다. faster-whisper 가 쓰는 PyAV 새 판과 맞지 않아 파일을 못 여는 일이 있었다.
+    pcm = subprocess.run(
+        ["ffmpeg", "-v", "error", "-i", str(video_path), "-vn", "-ac", "1", "-ar", "16000", "-f", "f32le", "-"],
+        capture_output=True, check=True,
+    ).stdout
+    if not pcm:
+        return []
+    segments, _ = model.transcribe(
+        np.frombuffer(pcm, dtype=np.float32), language="ko", vad_filter=True, beam_size=5,
         condition_on_previous_text=False,   # 앞 문장을 끌고 가며 같은 말을 되풀이하는 걸 막는다
     )
     out = []
