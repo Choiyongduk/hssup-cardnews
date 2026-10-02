@@ -43,6 +43,8 @@ SYSTEM = """당신은 히썹 반영구 아카데미 인스타그램의 기획 �
   (글자 카드, 일러스트, 체크리스트, 이벤트 안내처럼 디자인 담당이 혼자 만들 수 있는 것)
 - 찍어야 하는 아이디어는 무엇을 어떻게 찍을지 한 줄로. 폰으로 5분 안에 찍을 수 있는 것만.
 - 숫자를 지어내지 마세요. 모르면 근거에 숫자를 쓰지 마세요.
+- **먼저 후보를 {count}+3 개 떠올리세요.** 그다음 반대 의견 담당의 눈으로 보고, 근거가 약하거나 뻔하거나
+  최근에 안 통한 형식인 것 세 개를 버리세요. 남은 {count} 개만 `ideas` 에, 버린 것과 이유는 `dropped` 에.
 - 명사 3개 이상을 가운뎃점(·)으로 나열하지 마세요. 한자를 쓰지 마세요.
 
 `request` 는 디자인 담당에게 그대로 넘길 요청문입니다. 이미지에 들어갈 한글 문구(제목, 짧은 설명)와
@@ -64,6 +66,12 @@ TOOL = {
         "type": "object",
         "properties": {
             "greeting": {"type": "string", "description": "박서준 팀장의 파이팅 넘치는 아침 인사 두세 줄"},
+            "dropped": {
+                "type": "array",
+                "description": "후보 중 반대 의견으로 버린 것 세 개와 이유 한 줄",
+                "items": {"type": "object", "properties": {
+                    "title": {"type": "string"}, "reason": {"type": "string"}}, "required": ["title", "reason"]},
+            },
             "ideas": {
                 "type": "array",
                 "items": {
@@ -81,7 +89,7 @@ TOOL = {
                 },
             },
         },
-        "required": ["greeting", "ideas"],
+        "required": ["greeting", "ideas", "dropped"],
     },
 }
 
@@ -143,7 +151,7 @@ def _account_facts() -> dict:
         return {}
 
 
-def compose(ideas: list[dict], today: str, greeting: str = "") -> str:
+def compose(ideas: list[dict], today: str, greeting: str = "", dropped: list[dict] | None = None) -> str:
     """앱이 아이디어마다 버튼을 붙일 수 있게 정해진 모양으로 씁니다. 값은 한 줄씩.
 
     첫 "## " 앞까지는 박서준 팀장의 아침 인사입니다. 앱이 맨 위에 보여줍니다.
@@ -160,6 +168,10 @@ def compose(ideas: list[dict], today: str, greeting: str = "") -> str:
             f"- **요청문**: {_one_line(it.get('request'))}",
             "",
         ]
+    if dropped:
+        # "## " 로 시작하지 않게 둔다. 앱은 "## " 마다 아이디어 카드를 만든다.
+        lines.append("**버린 후보** (반대 의견으로 걸러낸 것)")
+        lines += [f"- {_one_line(d.get('title'))}: {_one_line(d.get('reason'))}" for d in dropped]
     return "\n".join(lines).strip()
 
 
@@ -197,7 +209,7 @@ def main() -> int:
         print(f"아이디어가 비어 있습니다 (stop_reason={resp.stop_reason}).")
         return 1
 
-    body = compose(ideas[: args.count], today, call.input.get("greeting", ""))
+    body = compose(ideas[: args.count], today, call.input.get("greeting", ""), call.input.get("dropped") or [])
     if args.dry:
         print(body)
         return 0
