@@ -92,6 +92,15 @@ PHOTO_NOTE = """사진 위에 글씨를 얹은 게시물입니다.
   `save_style` 에 짧은 이름(예: 후기)을 적으세요. 앱에서 소재를 올릴 때 그 이름으로 고를 수 있습니다.
 - 영상은 다시 그릴 수 없습니다. 영상에 디자인 요청이 오면 왜 안 되는지 알려주세요."""
 
+VIDEO_NOTE = """영상 게시물입니다. 영상 위에 로고와 짧은 글씨(headline)가 얹혀 있습니다.
+지금 영상 위 글씨: 「{headline}」
+- 캡션을 고치려면 `caption`
+- 영상 위 글씨를 바꾸거나, 로고가 흐리다거나 다시 입혀 달라는 요청이면 `headline` 에 영상 위에
+  얹을 글씨를 적으세요. 글씨를 안 바꾸면 지금 글씨를 그대로 적으면 됩니다. 로고와 글씨를 새로 입힙니다.
+- 영상 자체(자르기, 이어 붙이기, 배경음악, 화면 구성)는 바꿀 수 없습니다. 그런 요청엔 솔직하게 말하세요.
+- `redesign` 은 비워 두세요. 영상은 틀 없이 새로 그리지 못합니다.
+- 할 수 있다고 해 놓고 바로 못 한다고 하지 마세요. 할 수 있는 것만 한다고 답하세요."""
+
 FINISHED_NOTE = """원장님이 ChatGPT 등으로 직접 완성해서 올린 이미지입니다. 글씨까지 다 들어가 있습니다.
 - 캡션을 고치려면 `caption`
 - 그림은 고칠 수 없습니다. `headline`, `redesign` 은 비워 두세요.
@@ -314,8 +323,11 @@ def _ask(client, model: str, row: dict, msg: dict) -> dict:
 
     cards = _is_cards(row)
     kind_note = PHOTO_NOTE
-    if (row.get("payload") or {}).get("as_is"):
+    payload = row.get("payload") or {}
+    if payload.get("as_is"):
         kind_note = FINISHED_NOTE
+    elif payload.get("media_type") == "video":
+        kind_note = VIDEO_NOTE.format(headline=payload.get("headline") or "(기록 없음 — 영상을 보고 판단하세요)")
     elif cards:
         from engine.cards import style_summary
 
@@ -439,6 +451,18 @@ def _do_render(row: dict, result: dict) -> tuple[list[str] | None, str]:
     """그림을 다시 만듭니다. 게시물 종류에 따라 방식이 다릅니다."""
     if _is_cards(row):
         return _redraw_cards(row, result)
+
+    payload = row.get("payload") or {}
+    if payload.get("media_type") == "video":
+        # 영상은 새로 그리지 못한다. 로고와 글씨를 다시 입히는 것만. 글씨를 안 줬으면 지금 글씨 그대로.
+        headline = result.get("headline") or payload.get("headline")
+        if not headline:
+            return None, "\n\n(영상 위 글씨를 알 수 없어 다시 입히지 못했어요. 넣을 글씨를 말씀해 주세요.)"
+        urls = _rerender_photo(row, headline)
+        if urls:
+            trends_sync.update_approval_payload(row["id"], {**payload, "headline": headline})
+            return urls, f"\n\n(영상에 로고와 「{headline}」 글씨를 새로 입혔어요)"
+        return None, "\n\n(영상을 다시 만들지 못했어요. 원본을 찾을 수 없습니다.)"
 
     if result.get("redesign") or free_design.load(row["channel"], row["ref_key"]):
         return _redesign_photo(row, result)

@@ -124,6 +124,8 @@ def render_video_overlay(
             f"[0:v]scale={REELS_WIDTH}:{REELS_HEIGHT}:force_original_aspect_ratio=increase,"
             f"crop={REELS_WIDTH}:{REELS_HEIGHT}[bg];[bg][1:v]overlay=0:0[outv]",
             "-map", "[outv]", "-map", "0:a?", "-codec:a", "copy",
+            # 기본값(crf 23)은 로고 같은 가는 글자를 뭉갠다. 화질을 올리고, 폰에서 바로 재생되게.
+            "-c:v", "libx264", "-crf", "18", "-preset", "medium", "-pix_fmt", "yuv420p", "-movflags", "+faststart",
             str(out_path),
         ],
         capture_output=True, check=True,

@@ -25,10 +25,13 @@
 <body style="--brand-color: {{ brand_color }};">
   <div class="frame">
     <div class="gradient"></div>
+    <div style="position:absolute;left:0;right:0;top:0;height:260px;background:linear-gradient(to bottom, rgba(0,0,0,0.38), rgba(0,0,0,0));"></div>
 
     {% if logo_uri %}
     <div class="logo-badge" style="background: none; padding: 0; box-shadow: none; border: none;">
-      <img src="{{ logo_uri }}" style="height: 44px; filter: drop-shadow(0 0 5px rgba(255,255,255,0.9)) drop-shadow(0 0 5px rgba(255,255,255,0.9)) drop-shadow(0 2px 6px rgba(0,0,0,0.4));" />
+      {# 흰 번짐(drop-shadow 흰색 두 겹)이 글자 둘레를 뿌옇게 만들었다. 얇은 그림자 하나만 두고,
+         밝은 배경에서도 읽히게 위쪽에 옅은 어둠(.top-shade)을 깐다. #}
+      <img src="{{ logo_uri }}" style="height: 44px; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.55));" />
     </div>
     {% elif logo_text %}
     <div class="logo-badge logo-badge--text" style="background: none; padding: 0; box-shadow: none; border: none; color: #fff; text-shadow: 0 2px 8px rgba(0,0,0,0.45);">{{ logo_text }}</div>

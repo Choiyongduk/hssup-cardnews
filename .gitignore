@@ -7,3 +7,8 @@ state/inbox/
 state/queue_tmp/
 # 고객이 보낸 DM 원문과 발신자 ID가 들어 있습니다. 저장소가 공개라 올리면 안 됩니다.
 pending_dm/
+
+# 비밀값을 적어 둔 메모가 공개 저장소에 올라가지 않게
+*token*.txt
+*Token*.txt
+*비밀*

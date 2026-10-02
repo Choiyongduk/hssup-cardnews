@@ -218,6 +218,7 @@ def _process_one(cfg: dict, token: str, chat_id: str, entry_path: Path) -> None:
                 "media_type": entry.get("media_type"),
                 "as_is": bool(entry.get("as_is")),  # 시안 대화에서 그림을 다시 그리지 않게
                 "app_queue_ids": _queue_ids(entry),  # 앱에서 "시안 나옴" 을 짝지을 때
+                "headline": post.get("headline"),  # 로고만 다시 입힐 때 지금 글씨를 그대로 쓰려고
             },
         )
     except Exception as e:

@@ -265,6 +265,22 @@ def update_approval_content(row_id: int, body: str | None = None, image_urls: li
         raise RuntimeError(f"승인 내용 갱신 실패: {resp.status_code} {resp.text}")
 
 
+def update_approval_payload(row_id: int, payload: dict) -> None:
+    """승인 대기 건의 payload 를 통째로 바꿔 씁니다(예: 영상 위 글씨를 기록)."""
+    url = os.environ.get("SUPABASE_URL")
+    key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+    resp = requests.patch(
+        f"{url}/rest/v1/ai_approvals",
+        headers={"apikey": key, "Authorization": f"Bearer {key}",
+                 "Content-Type": "application/json", "Prefer": "return=minimal"},
+        params={"id": f"eq.{row_id}"},
+        json={"payload": payload},
+        timeout=30,
+    )
+    if resp.status_code not in (200, 204):
+        raise RuntimeError(f"승인 payload 갱신 실패: {resp.status_code} {resp.text}")
+
+
 def fetch_media_queue() -> list[dict]:
     """앱에서 올린 사진·영상 중 아직 처리하지 않은 것 (오래된 순)."""
     try:
