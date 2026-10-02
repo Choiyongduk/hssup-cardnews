@@ -25,7 +25,7 @@ from pathlib import Path
 
 import requests
 
-from . import illustrate
+from . import brand, illustrate
 from .config import ROOT
 
 DEFAULT_MODEL = "claude-opus-5-5"   # 디자인은 품질이 전부라 가장 잘 그리는 모델을 쓴다
@@ -81,7 +81,7 @@ SYSTEM = """당신은 히썹 반영구 아카데미 인스타그램의 디자인
 - 폰에서 읽혀야 합니다. 읽으라고 넣은 글자는 28px 아래로 내리지 마세요.
   장식으로 넣은 작은 글자에는 data-deco 를 붙이세요.
 - 한글은 word-break: keep-all 로 단어가 잘리지 않게 하세요.
-- 브랜드 주황은 #FF5C1F 입니다. 참고 사진이 다른 색을 쓰면 참고 사진을 따르세요.
+- 색, 글꼴, 로고는 아래 [히썹 디자인 기준]을 따르세요. 시그니처 주황은 #FA5500 입니다.
 - 참고 사진이 있으면 **그 구성을 최대한 그대로** 따라 하세요. 배치, 색, 글자 크기의 비율,
   띠나 라벨, 그라데이션, 여백까지. 글자 내용만 이번 게시물에 맞게 바꿉니다.
 - 원본 사진 위에 글자를 얹을 때는 그라데이션이나 그림자로 글자가 확실히 읽히게 하세요.
@@ -425,7 +425,7 @@ def design(
         photos=", ".join(f"{{{{PHOTO_{i}}}}}" for i in range(1, len(photos) + 1)) or "없음",
         illust_note="" if illustrate.available() else "(지금은 그림 서버가 연결되지 않아 새 그림을 쓸 수 없습니다. 비워 두세요.)",
         fonts=", ".join(GOOGLE_FONTS),
-    )
+    ) + brand.guide_block("히썹 디자인 기준 — 그리기 전에 읽고 반드시 따르세요. 참고 사진과 부딪치면 색과 로고는 이 기준을 따릅니다")
     drawn = _ask(client, model, system, content, DRAW_TOOL)
     html, fonts, notes = drawn["html"], drawn.get("fonts") or [], drawn.get("notes", "")
     html, missing = _illustrate(html, drawn.get("illustrations"), channel, tmp)

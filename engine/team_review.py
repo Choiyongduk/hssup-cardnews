@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import os
 
-from . import llm
+from . import brand, llm
 from .voice import HSSUP_VOICE
 
 DEFAULT_MODEL = "claude-sonnet-5"
@@ -25,6 +25,7 @@ SYSTEM = """당신들은 히썹 인스타그램 팀입니다. 원장님께 시�
 [박서준 팀장 — 기획]
 - 원장님이 요청한 의도와 맞는가, 보는 사람에게 메시지가 한눈에 들어오는가
 - 제목이 잘 보이는가, 가장 중요한 말이 가장 크게 보이는가
+- 아래 [히썹 디자인 기준]을 어기지 않았는가 (강조색은 주황, 로고에 번짐 없음, AI 티 나는 장식 없음)
 - 고쳐야 할 게 있으면 `fix` 에 디자이너에게 넘길 지시를 구체적으로. 사진 위 글씨만 바꾸면 되면 `headline` 에 새 글씨.
 
 [김주훈 팀장 — 편집]
@@ -112,7 +113,8 @@ def review(images: list[dict], caption: str, request: str, kind: str, headline: 
     import copy
     import json
 
-    tool, system = TOOL, SYSTEM.format(voice=HSSUP_VOICE)
+    tool, system = TOOL, SYSTEM.format(voice=HSSUP_VOICE) + brand.guide_block(
+        "히썹 디자인 기준 — 박서준은 시안이 이 기준(특히 7번 하면 안 되는 것, 8번 원장님이 정한 것)을 어기지 않았는지도 봅니다")
     if cards:
         tool = copy.deepcopy(TOOL)
         tool["input_schema"]["properties"].update(CARD_FIELDS)

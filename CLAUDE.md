@@ -52,6 +52,8 @@ cardnews는 RSS 기사를 요약해 디자인 카드(PNG)를 만드는 구조였
   그린 HTML 은 `data/posts/<채널>-<ref>-free.html` 에 떠두고 이후 수정은 그 위에서 합니다.
   저장한 디자인(`ai_styles`)은 `apply_style` 로 AI 없이 제목만 바꿔 그립니다.
 - `engine/attachments.py` — 원장님이 대화에 붙인 사진을 클로드에게 그림으로 넘깁니다.
+- `assets/brand/DESIGN.md` + `engine/brand.py` — 히썹 디자인 기준(색, 글꼴, 로고, 해도 되는 것과 안 되는 것, 원장님이 정한 것).
+  디자인 담당(free_design)이 그리기 전에, 내부 검수(team_review)가 볼 때 매번 읽습니다. 기준을 바꾸려면 이 파일만 고칩니다.
 - `engine/llm.py` — 클로드를 부르는 창구. `Anthropic()` 대신 `llm.client()` 를 씁니다.
   `CLAUDE_CODE_OAUTH_TOKEN` 이 있으면 구독(claude -p)을 먼저, 안 되면 API. 운영.md "구독으로 돌리기" 참고.
 - `engine/assets.py` — 이미지를 공개 저장소(ASSETS_REPO)에 업로드해 공개 URL 확보
