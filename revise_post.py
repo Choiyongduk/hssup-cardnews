@@ -488,6 +488,33 @@ def _handoff(approval_id: int, to_staff: str) -> None:
     print(f"  - {staff.get(last['staff'])['name']} → {nxt['name']} 넘김")
 
 
+def _before_after(old: list[str] | None, new: list[str] | None, focus: int | None = None) -> list[str] | None:
+    """그림이 바뀌었으면 처음 달라진 장의 [고치기 전, 고친 후]. 안 바뀌었으면 None.
+
+    시안 카드 위쪽은 늘 최신 그림만 보여서, 대화창에 이 둘을 남겨야 "아 이렇게 고쳐졌구나" 가 보인다.
+    """
+    if not new or new == old:
+        return None
+    old = old or []
+    # 카드뉴스는 한 장만 고쳐도 전부 새 주소로 다시 올라간다. 고친 카드를 짚어서 보여준다.
+    if focus is not None and focus < len(old) and focus < len(new):
+        return [old[focus], new[focus]]
+    for i, url in enumerate(new):
+        if i >= len(old) or old[i] != url:
+            return [old[i], url] if i < len(old) else [url]
+    return None
+
+
+def _focus(row: dict, result: dict) -> int | None:
+    """카드뉴스에서 글을 고친 첫 카드의 그림 위치(표지가 0, 1번 카드가 1)."""
+    if _is_cards(row) and result.get("cards"):
+        try:
+            return int(result["cards"][0].get("index", 0))
+        except (TypeError, ValueError):
+            return None
+    return None
+
+
 def _finish(row: dict, msg_id: int, result: dict, image_urls: list[str] | None) -> None:
     """고친 내용을 반영하고 담당자 이름으로 답을 남깁니다."""
     approval_id = row["id"]
@@ -505,7 +532,8 @@ def _finish(row: dict, msg_id: int, result: dict, image_urls: list[str] | None) 
     _handoff(approval_id, result["staff"])
 
     who = staff.get(result["staff"])
-    trends_sync.create_approval_message(approval_id, "staff", result["reply"], staff_key=result["staff"])
+    trends_sync.create_approval_message(approval_id, "staff", result["reply"], staff_key=result["staff"],
+                                        attachments=_before_after(row.get("image_urls"), image_urls, _focus(row, result)))
     trends_sync.mark_approval_message_answered(msg_id)
     _notify(row["channel"], f"✏️ {who['name']} 팀장\n\n{result['reply']}")
     print(f"  - {who['name']} 팀장이 처리 완료 (approval {approval_id})")

@@ -205,16 +205,19 @@ def fetch_approval_thread(approval_id: int) -> list[dict]:
     return _get_thread("ai_approval_messages", {"approval_id": f"eq.{approval_id}", "order": "created_at.asc"})
 
 
-def create_approval_message(approval_id: int, role: str, body: str, staff_key: str = "") -> None:
-    """단체 채팅방에 한 마디 남깁니다. staff_key 는 누가 답했는지 표시용입니다."""
+def create_approval_message(approval_id: int, role: str, body: str, staff_key: str = "",
+                            attachments: list[str] | None = None) -> None:
+    """단체 채팅방에 한 마디 남깁니다. staff_key 는 누가 답했는지 표시용입니다.
+
+    attachments: 말풍선에 같이 보일 그림 주소. 시안을 고쳤으면 고치기 전과 고친 후를 붙여
+    대화창만 올려 봐도 어떻게 바뀌어 왔는지 보이게 합니다.
+    """
     row = {"approval_id": approval_id, "role": role, "body": body, "answered": True}
-    if not staff_key:
-        _post("ai_approval_messages", row)
-        return
+    full = {**row, **({"staff": staff_key} if staff_key else {}), **({"attachments": attachments} if attachments else {})}
     try:
-        _post("ai_approval_messages", {**row, "staff": staff_key})
+        _post("ai_approval_messages", full)
     except Exception:
-        # staff 칸이 아직 없는 데이터베이스에서도 말은 남아야 합니다.
+        # staff, attachments 칸이 아직 없는 데이터베이스에서도 말은 남아야 합니다.
         _post("ai_approval_messages", row)
 
 
