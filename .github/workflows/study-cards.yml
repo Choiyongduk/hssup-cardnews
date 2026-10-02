@@ -1,0 +1,41 @@
+name: Study Cards
+
+# 꿀팁 글마다 수강생 복습 카드를 만듭니다(make_study_cards.py). 아침 브리핑에서도 새 글만 골라 돕니다.
+# 여기서는 손으로 돌릴 때. "미리보기" 면 저장하지 않고 실행 기록에만 보여줍니다.
+# 만든 카드는 원장님이 앱에서 "공개" 를 눌러야 수강생에게 보입니다.
+on:
+  workflow_dispatch:
+    inputs:
+      dry:
+        description: "미리보기 (저장 안 함)"
+        type: boolean
+        default: true
+      limit:
+        description: "한 번에 만들 글 수"
+        default: "5"
+
+permissions:
+  contents: read
+
+jobs:
+  cards:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Make study cards
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          DRY: ${{ inputs.dry && '--dry' || '' }}
+          LIMIT: ${{ inputs.limit }}
+        run: |
+          pip install --quiet anthropic PyYAML python-dotenv requests
+          python make_study_cards.py --limit "$LIMIT" $DRY

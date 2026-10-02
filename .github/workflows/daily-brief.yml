@@ -43,6 +43,16 @@ jobs:
           HSSUP_MAIN_IG_TOKEN: ${{ secrets.HSSUP_MAIN_IG_TOKEN }}
         run: python daily_ideas.py --count 5
 
+      # 새로 쓰거나 고친 꿀팁 글에만 복습 카드를 만든다. 대부분의 날은 할 일이 없어 바로 끝난다.
+      - name: Make study cards for new tips
+        continue-on-error: true
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: python make_study_cards.py --limit 3
+
       - name: Write the morning brief
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
