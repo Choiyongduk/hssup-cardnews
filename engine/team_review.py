@@ -72,12 +72,54 @@ TOOL = {
     },
 }
 
+# 카드뉴스는 원본 사진이 없고 카드 글자를 바꿔 다시 그린다. 두 사람이 카드 글을 직접 고칠 수 있게 칸을 더 준다.
+CARDS_NOTE = """
+[카드뉴스일 때]
+카드에 박힌 글(표지 제목, 카드 제목, 설명 줄, 요점)을 고쳐야 하면 `cards` 에 고칠 카드만 적으세요.
+표지 제목은 `cover_title` 에. 박서준은 메시지와 강조, 김주훈은 오타와 사실을 봅니다. 둘의 고칠 점을 합쳐서 적으세요.
+카드에 박히는 글은 존댓말로 끝내지 말고 명사나 단정형으로 끊습니다. 제목에 대괄호 [ ] 를 쓰면 그 부분이 강조색이 됩니다.
+카드 번호: 표지 다음 장이 1번입니다. 마지막 장(마무리)은 고치지 않습니다.
+현재 카드 글:
+{cards}"""
 
-def review(images: list[dict], caption: str, request: str, kind: str, headline: str = "") -> dict:
+CARD_FIELDS = {
+    "cover_title": {"type": "string", "description": "표지 제목을 바꿀 때만. 아니면 빈 문자열"},
+    "cards": {
+        "type": "array",
+        "description": "고칠 카드만. 안 고치면 빈 배열",
+        "items": {
+            "type": "object",
+            "properties": {
+                "index": {"type": "integer", "description": "몇 번째 카드인지 (표지 다음이 1)"},
+                "title": {"type": "string"},
+                "summary": {"type": "array", "items": {"type": "string"}},
+                "why": {"type": "string"},
+            },
+            "required": ["index"],
+        },
+    },
+}
+
+
+def review(images: list[dict], caption: str, request: str, kind: str, headline: str = "",
+           cards: dict | None = None) -> dict:
     """시안 그림(images: 그림 조각들)과 캡션을 보고 두 사람의 판단을 돌려줍니다.
 
-    돌려주는 값: {"planner": {...}, "editor": {...}}. 실패하면 예외 — 부른 쪽에서 건너뜁니다.
+    cards: 카드뉴스면 지금 카드 내용({"headline", "items": [...]}). 주면 카드 글을 고칠 수 있다.
+    돌려주는 값: {"planner": {...}, "editor": {...}, "cover_title": str, "cards": [...]}.
+    실패하면 예외 — 부른 쪽에서 건너뜁니다.
     """
+    import copy
+    import json
+
+    tool, system = TOOL, SYSTEM.format(voice=HSSUP_VOICE)
+    if cards:
+        tool = copy.deepcopy(TOOL)
+        tool["input_schema"]["properties"].update(CARD_FIELDS)
+        listing = {"표지 제목": cards.get("headline"),
+                   "카드": [{"번호": i, **{k: it.get(k) for k in ("title", "summary", "why")}}
+                           for i, it in enumerate(cards.get("items") or [], 1)]}
+        system += CARDS_NOTE.format(cards=json.dumps(listing, ensure_ascii=False, indent=1))
     content = [
         {"type": "text", "text": f"[시안 종류] {kind}"},
         {"type": "text", "text": f"[원장님 요청 / 설명]\n{request or '(따로 없음)'}"},
@@ -91,8 +133,8 @@ def review(images: list[dict], caption: str, request: str, kind: str, headline: 
     resp = llm.client().messages.create(
         model=os.environ.get("CLAUDE_MODEL", DEFAULT_MODEL),
         max_tokens=4000,
-        system=SYSTEM.format(voice=HSSUP_VOICE),
-        tools=[TOOL],
+        system=system,
+        tools=[tool],
         tool_choice={"type": "tool", "name": "review"},
         messages=[{"role": "user", "content": content}],
     )
@@ -117,4 +159,6 @@ def review(images: list[dict], caption: str, request: str, kind: str, headline: 
             "comment": (editor.get("comment") or "").strip(),
             "caption": (editor.get("caption") or "").strip(),
         },
+        "cover_title": (out.get("cover_title") or "").strip(),
+        "cards": out.get("cards") or [],
     }

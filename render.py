@@ -15,6 +15,79 @@ from engine.validate import validate
 WEEKDAYS = "월화수목금토일"
 
 
+def _team_review(cfg, data, items, pngs, caption, out_dir):
+    """박서준(기획)과 김주훈(편집)이 카드뉴스를 먼저 보고, 카드 글과 캡션을 한 바퀴만 고칩니다.
+
+    카드 글을 고치면 차은우(디자인)가 다시 그립니다. 다시 그린 게 깨지면 처음 것을 씁니다.
+    돌려주는 값: (캡션, 그림들, 카드 데이터, 카드 목록, 대화 기록 [(담당, 말)])
+    """
+    import copy
+
+    log: list[tuple[str, str]] = []
+    try:
+        from engine import free_design, team_review
+
+        images = [free_design._b64_block(p.read_bytes()) for p in pngs[:7]]
+        rv = team_review.review(
+            images, caption, f"주제: {cfg.get('topic', cfg['name'])}", f"카드뉴스 {len(pngs)}장",
+            cards={"headline": data.get("headline"), "items": items},
+        )
+    except Exception as e:
+        print(f"  ! 내부 검수를 건너뜁니다: {e}")
+        return caption, pngs, data, items, log
+
+    planner, editor = rv["planner"], rv["editor"]
+    if planner["comment"]:
+        log.append(("planner", planner["comment"]))
+    if editor["comment"]:
+        log.append(("editor", editor["comment"]))
+    if not editor["ok"] and editor["caption"] and editor["caption"] != caption:
+        caption = editor["caption"]
+        print("  - 내부 검수: 캡션 고침")
+
+    edits, cover = rv["cards"], rv["cover_title"]
+    if not (edits or cover):
+        return caption, pngs, data, items, log
+
+    fixed = copy.deepcopy(data)
+    if cover:
+        fixed["headline"] = cover
+    n = min(cfg["cards"], len(fixed["items"]))
+    for edit in edits:
+        i = int(edit.get("index", 0)) - 1
+        if not 0 <= i < n:
+            continue
+        for k in ("title", "summary", "why"):
+            if edit.get(k):
+                fixed["items"][i][k] = edit[k]
+
+    renderer = Renderer(cfg)
+    fixed_pngs = renderer.render(fixed, fixed["items"][:n], out_dir / "review")
+    if renderer.problems:
+        print(f"  ! 내부 검수로 고친 카드가 깨져서 처음 것 그대로: {renderer.problems[0]}")
+        log.append(("designer", "말씀하신 대로 고쳐 그려 봤는데 깨지는 데가 있어서 처음 것 그대로 둘게요."))
+        return caption, pngs, data, items, log
+    changed = len({e.get("index") for e in edits}) + (1 if cover else 0)
+    log.append(("designer", f"말씀하신 카드 글 {changed}군데 고쳐서 다시 그렸어요."))
+    print(f"  - 내부 검수: 카드 글 {changed}군데 고쳐 다시 그림")
+    return caption, fixed_pngs, fixed, fixed["items"][:n], log
+
+
+def _post_team_log(slug: str, key: str, log: list[tuple[str, str]]) -> None:
+    """내부 검수에서 오간 말을 시안 대화창에 남깁니다."""
+    if not log:
+        return
+    try:
+        from engine import trends_sync
+
+        rows = trends_sync._get("ai_approvals", {"select": "id", "channel": f"eq.{slug}", "ref_key": f"eq.{key}"})
+        if rows:
+            for staff_key, body in log:
+                trends_sync.create_approval_message(rows[0]["id"], "staff", body, staff_key=staff_key)
+    except Exception as e:
+        print(f"  ! 내부 검수 대화를 남기지 못했습니다: {e}")
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="카드뉴스 PNG 생성")
     ap.add_argument("--channel", required=True, help="channels/<이름>.yaml")
@@ -51,6 +124,8 @@ def main() -> int:
     print(f"[{cfg['name']}] 렌더링 중 → {out_dir}")
     pngs = Renderer(cfg).render(data, items, out_dir)
     caption = build_caption(data, cfg, items)
+    # 원장님께 올리기 전에 팀이 먼저 본다(engine/team_review.py). 실패해도 카드뉴스는 올라간다.
+    caption, pngs, data, items, team_log = _team_review(cfg, data, items, pngs, caption, out_dir)
     (out_dir / "caption.txt").write_text(caption, encoding="utf-8")
 
     for p in pngs:
@@ -93,6 +168,7 @@ def main() -> int:
                 payload={"media_type": "carousel", "cards": len(pngs)},
             )
             print("  앱 승인 목록 등록 완료")
+            _post_team_log(cfg["slug"], key, team_log)
         except Exception as e:
             print(f"  ! 앱 승인 등록 실패: {e}")
     except ValueError as e:

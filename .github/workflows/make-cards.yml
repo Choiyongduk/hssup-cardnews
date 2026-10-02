@@ -51,6 +51,9 @@ jobs:
 
       - name: Draw the cards
         env:
+          # 내부 검수(박서준, 김주훈)가 카드를 보고 고친다. 없으면 검수만 건너뛴다
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}  # 있으면 구독 먼저 (engine/llm.py)
           ASSETS_REPO: ${{ secrets.ASSETS_REPO }}
           ASSETS_REPO_TOKEN: ${{ secrets.ASSETS_REPO_TOKEN }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
