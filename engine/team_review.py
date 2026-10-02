@@ -114,7 +114,8 @@ def review(images: list[dict], caption: str, request: str, kind: str, headline: 
     import json
 
     tool, system = TOOL, SYSTEM.format(voice=HSSUP_VOICE) + brand.guide_block(
-        "히썹 디자인 기준 — 박서준은 시안이 이 기준(특히 7번 하면 안 되는 것, 8번 원장님이 정한 것)을 어기지 않았는지도 봅니다")
+        "히썹 디자인 기준 — 박서준은 시안이 이 기준(특히 7번 하면 안 되는 것, 8번 원장님이 정한 것)을 어기지 않았는지도 봅니다") + brand.marketing_block(
+        "히썹 콘텐츠 마케팅 기준 — 김주훈은 캡션 첫 줄(1번)과 할 일 하나(4번), 박서준은 카드뉴스 짜임(3번)도 봅니다")
     if cards:
         tool = copy.deepcopy(TOOL)
         tool["input_schema"]["properties"].update(CARD_FIELDS)

@@ -20,7 +20,7 @@ import json
 import os
 import sys
 
-from engine import feed, llm, trends_sync
+from engine import brand, feed, llm, trends_sync
 from engine.config import ROOT, load_channel  # noqa: F401  (.env 를 읽어 환경변수를 채웁니다)
 
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -186,7 +186,7 @@ def main() -> int:
     resp = llm.client().messages.create(
         model=os.environ.get("CLAUDE_MODEL", DEFAULT_MODEL),
         max_tokens=4000,
-        system=SYSTEM.format(count=args.count),
+        system=SYSTEM.format(count=args.count) + brand.marketing_block(),
         tools=[TOOL],
         tool_choice={"type": "tool", "name": "ideas"},
         messages=[{"role": "user", "content": json.dumps(payload, ensure_ascii=False, indent=2)}],

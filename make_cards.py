@@ -15,7 +15,7 @@ import json
 import os
 import sys
 
-from engine import llm
+from engine import brand, llm
 
 from engine import trends_sync
 from engine.config import ROOT, load_channel
@@ -254,7 +254,7 @@ def main() -> int:
             title_limit=lim["title"],
             recent=_recent_note(cfg["slug"]),
             voice=HSSUP_VOICE,
-        ),
+        ) + brand.marketing_block("히썹 콘텐츠 마케팅 기준 — 특히 1번 첫 줄과 3번 카드뉴스 짜임을 따르세요"),
         tools=[tool],
         tool_choice={"type": "tool", "name": "cards"},
         messages=[{"role": "user", "content": body}],

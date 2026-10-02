@@ -6,7 +6,7 @@ import io
 import os
 from pathlib import Path
 
-from . import llm
+from . import brand, llm
 from PIL import Image
 
 from .voice import HSSUP_VOICE
@@ -60,7 +60,8 @@ def write_post(
     resp = client.messages.create(
         model=model or os.environ.get("CLAUDE_MODEL", DEFAULT_MODEL),
         max_tokens=1024,
-        system=SYSTEM_TEMPLATE.format(topic=topic, voice=HSSUP_VOICE),
+        system=SYSTEM_TEMPLATE.format(topic=topic, voice=HSSUP_VOICE)
+        + brand.marketing_block("히썹 콘텐츠 마케팅 기준 — 캡션 첫 줄은 1번, 캡션은 4번을 따르세요"),
         tools=[
             {
                 "name": "write_post",

@@ -25,3 +25,20 @@ def guide_block(intro: str) -> str:
     """시스템 프롬프트 끝에 붙일 덩어리. 기준 파일이 없으면 빈 문자열."""
     guide = design_guide()
     return f"\n\n[{intro}]\n{guide}" if guide else ""
+
+
+MARKETING_PATH = ROOT / "assets" / "brand" / "MARKETING.md"
+
+
+@lru_cache(maxsize=1)
+def marketing_guide() -> str:
+    try:
+        return MARKETING_PATH.read_text(encoding="utf-8").strip()
+    except OSError:
+        return ""
+
+
+def marketing_block(intro: str = "히썹 콘텐츠 마케팅 기준 — 후킹, 형식, 카드뉴스 짜임, 캡션, 릴스") -> str:
+    """기획, 캡션, 카드뉴스, 검수가 함께 읽는 마케팅 기준(assets/brand/MARKETING.md)."""
+    guide = marketing_guide()
+    return f"\n\n[{intro}]\n{guide}" if guide else ""

@@ -14,7 +14,7 @@ import json
 import os
 import sys
 
-from engine import llm
+from engine import brand, llm
 
 from engine import attachments, feed, telegram, trends_sync
 from engine.config import ROOT, load_channel
@@ -106,7 +106,7 @@ def main() -> int:
     resp = client.messages.create(
         model=os.environ.get("CLAUDE_MODEL", DEFAULT_MODEL),
         max_tokens=8000,
-        system=SYSTEM.format(name=cfg["name"], voice=HSSUP_VOICE),
+        system=SYSTEM.format(name=cfg["name"], voice=HSSUP_VOICE) + brand.marketing_block(),
         messages=[{"role": "user", "content": attachments.requests_content(
             json.dumps(payload, ensure_ascii=False, indent=2), pending)}],
     )
