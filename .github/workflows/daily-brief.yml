@@ -3,9 +3,14 @@ name: Daily Brief
 # 아침 보고와 월요일 회의록.
 # 전부 원장님이 앱을 열어야 돌아갔는데, 이건 먼저 말을 겁니다.
 #
-# cron-job.org 가 매일 아침 8시(KST)에 호출합니다.
 # 월요일이면 회의록도 같이 씁니다.
+#
+# cron-job.org 에 이 잡이 등록돼 있지 않아 10/5·10/6 아침에 아무것도 안 나갔다.
+# 그래서 GitHub schedule 로 부른다. 몇십 분 밀릴 수 있어 8시보다 조금 일찍 건다.
+# cron-job.org 에도 등록하면 하루 두 번 돌아 아이디어가 두 벌 나가니, 둘 중 하나만 쓸 것.
 on:
+  schedule:
+    - cron: "30 22 * * *"  # 매일 07:30 KST
   workflow_dispatch:
     inputs:
       meeting:
