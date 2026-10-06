@@ -12,7 +12,6 @@ from pathlib import Path
 
 from . import assets
 from .config import ROOT
-from .renderer import Renderer
 from .sources import get_source
 
 
@@ -77,6 +76,9 @@ def redraw(cfg: dict, ref_key: str) -> tuple[list[str], list[str]]:
     data["date"] = date.isoformat()
     weekdays = "월화수목금토일"
     data["date_label"] = f"{date.year}.{date.month:02d}.{date.day:02d} ({weekdays[date.weekday()]})"
+
+    # 글만 고치는 단계는 jinja2/playwright 없이 돈다 — 그릴 때만 불러온다
+    from .renderer import Renderer
 
     renderer = Renderer(cfg)
     with tempfile.TemporaryDirectory() as tmp:
