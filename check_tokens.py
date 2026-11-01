@@ -117,7 +117,7 @@ def main() -> int:
 
     if problems:
         text = "🔑 인스타그램 토큰 점검\n\n" + "\n".join(problems)
-        text += "\n\nGraph API 탐색기에서 사용자 토큰을 새로 발급받아 교체해주세요."
+        text += "\n\nGraph API 탐색기에서 사용자 토큰을 새로 받아 내 컴퓨터에서 python renew_ig_tokens.py 를 실행해주세요."
         print("\n".join(problems))
         _notify(text)
     else:

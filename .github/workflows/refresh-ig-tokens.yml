@@ -25,5 +25,9 @@ jobs:
         env:
           FB_APP_ID: ${{ secrets.FB_APP_ID }}
           FB_APP_SECRET: ${{ secrets.FB_APP_SECRET }}
-          HSSUP_IG_TOKEN: ${{ secrets.HSSUP_IG_TOKEN }}
+          # channels/*.yaml 의 token_env 와 이름이 같아야 합니다 (예전 HSSUP_IG_TOKEN 이름이 남아 매주 전부 건너뛰었음)
+          HSSUP_ACADEMY_IG_TOKEN: ${{ secrets.HSSUP_ACADEMY_IG_TOKEN }}
+          HSSUP_MAIN_IG_TOKEN: ${{ secrets.HSSUP_MAIN_IG_TOKEN }}
+          ARTMAKE_IG_TOKEN: ${{ secrets.ARTMAKE_IG_TOKEN }}
+          PREPPY_POP_IG_TOKEN: ${{ secrets.PREPPY_POP_IG_TOKEN }}
         run: python refresh_ig_tokens.py
