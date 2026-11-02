@@ -50,7 +50,13 @@ def main() -> int:
         if ig_cfg:
             targets[ig_cfg["token_env"]] = os.environ.get(ig_cfg["business_id_env"], "")
 
-    short = getpass.getpass("Graph API 탐색기 사용자 토큰 붙여넣기 (화면에 안 보임): ").strip()
+    # RENEW_IG_TOKEN 환경변수나 파이프로 넘기면 화면에 찍지 않고 그대로 읽는다
+    if os.environ.get("RENEW_IG_TOKEN"):
+        short = os.environ["RENEW_IG_TOKEN"].strip()
+    elif sys.stdin.isatty():
+        short = getpass.getpass("Graph API 탐색기 사용자 토큰 붙여넣기 (화면에 안 보임): ").strip()
+    else:
+        short = sys.stdin.readline().strip()
     if not short:
         return 1
     user_token, _ = instagram.refresh_long_lived_token(short, app_id, app_secret)
