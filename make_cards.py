@@ -254,7 +254,7 @@ def main() -> int:
             title_limit=lim["title"],
             recent=_recent_note(cfg["slug"]),
             voice=HSSUP_VOICE,
-        ) + brand.marketing_block("히썹 콘텐츠 마케팅 기준 — 특히 1번 첫 줄과 3번 카드뉴스 짜임을 따르세요"),
+        ) + brand.marketing_block("히썹 콘텐츠 마케팅 기준 — 특히 1번 첫 줄과 3번 카드뉴스 짜임을 따르세요") + brand.facts_block(),
         tools=[tool],
         tool_choice={"type": "tool", "name": "cards"},
         messages=[{"role": "user", "content": body}],

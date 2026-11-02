@@ -198,7 +198,7 @@ def main() -> int:
     resp = llm.client().messages.create(
         model=os.environ.get("CLAUDE_MODEL", DEFAULT_MODEL),
         max_tokens=4000,
-        system=SYSTEM.format(count=args.count) + brand.marketing_block(),
+        system=SYSTEM.format(count=args.count) + brand.marketing_block() + brand.facts_block(),
         tools=[TOOL],
         tool_choice={"type": "tool", "name": "ideas"},
         messages=[{"role": "user", "content": json.dumps(payload, ensure_ascii=False, indent=2)}],

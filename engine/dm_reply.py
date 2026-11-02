@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import os
 
-from . import llm
+from . import brand, llm
 
 DEFAULT_MODEL = "claude-sonnet-5"
 
@@ -24,7 +24,8 @@ def write_reply(incoming_text: str, topic: str, context: str = "", model: str | 
     resp = client.messages.create(
         model=model or os.environ.get("CLAUDE_MODEL", DEFAULT_MODEL),
         max_tokens=512,
-        system=SYSTEM_TEMPLATE.format(topic=topic, context=context or "(별도 참고 정보 없음)"),
+        system=SYSTEM_TEMPLATE.format(topic=topic, context=context or "(별도 참고 정보 없음)")
+        + (brand.facts_block("히썹 사실 자료 — 답에 쓸 수 있는 정보. 가격은 여기에도 없으니 상담으로 안내") if "히썹" in topic else ""),
         messages=[{"role": "user", "content": f"고객이 보낸 DM: {incoming_text}"}],
     )
     return "".join(block.text for block in resp.content if block.type == "text").strip()

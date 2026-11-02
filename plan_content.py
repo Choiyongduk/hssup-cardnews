@@ -169,7 +169,7 @@ def main() -> int:
     resp = client.messages.create(
         model=os.environ.get("CLAUDE_MODEL", DEFAULT_MODEL),
         max_tokens=8000,
-        system=SYSTEM.format(name=cfg["name"], count=args.count, voice=HSSUP_VOICE) + brand.marketing_block(),
+        system=SYSTEM.format(name=cfg["name"], count=args.count, voice=HSSUP_VOICE) + brand.marketing_block() + (brand.facts_block() if "히썹" in cfg["name"] else ""),
         messages=[{"role": "user", "content": attachments.requests_content(
             json.dumps(payload, ensure_ascii=False, indent=2), pending or [])}],
     )

@@ -42,3 +42,20 @@ def marketing_block(intro: str = "히썹 콘텐츠 마케팅 기준 — 후킹, 
     """기획, 캡션, 카드뉴스, 검수가 함께 읽는 마케팅 기준(assets/brand/MARKETING.md)."""
     guide = marketing_guide()
     return f"\n\n[{intro}]\n{guide}" if guide else ""
+
+
+FACTS_PATH = ROOT / "assets" / "brand" / "FACTS.md"
+
+
+@lru_cache(maxsize=1)
+def facts_guide() -> str:
+    try:
+        return FACTS_PATH.read_text(encoding="utf-8").strip()
+    except OSError:
+        return ""
+
+
+def facts_block(intro: str = "히썹 사실 자료 — 숫자, 경력, 과정, 자주 묻는 질문은 여기 있는 것만 쓰세요") -> str:
+    """랜딩페이지에서 옮긴 히썹 사실 자료(assets/brand/FACTS.md). 프레피팝처럼 다른 브랜드에는 붙이지 않습니다."""
+    facts = facts_guide()
+    return f"\n\n[{intro}]\n{facts}" if facts else ""
