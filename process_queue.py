@@ -166,7 +166,7 @@ def _process_one(cfg: dict, token: str, chat_id: str, entry_path: Path) -> None:
                     out_path=media_path.with_name(media_path.stem + "_post.mp4"),
                     logo_path=(ROOT / video_logo) if video_logo else None,
                     logo_text=overlay_cfg.get("logo_text"),
-                    brand_color=overlay_cfg.get("brand_color", "#ff5c1f"),
+                    brand_color=overlay_cfg.get("brand_color", "#ff4500"),
                     subtitles=subs,
                 )
             else:
@@ -178,7 +178,7 @@ def _process_one(cfg: dict, token: str, chat_id: str, entry_path: Path) -> None:
                         out_path=media_path.with_name(media_path.stem + "_post.png"),
                         logo_path=(ROOT / overlay_cfg["logo"]) if overlay_cfg.get("logo") else None,
                         logo_text=overlay_cfg.get("logo_text"),
-                        brand_color=overlay_cfg.get("brand_color", "#ff5c1f"),
+                        brand_color=overlay_cfg.get("brand_color", "#ff4500"),
                     )
             # 표지에만 헤드라인을 얹는다. 뒷장은 원본 그대로 넘어간다.
             post_paths = [rendered] + media_paths[1:]
@@ -302,7 +302,7 @@ def _team_review(entry, slug, date_key, cfg, post_paths, caption, post, media_pa
                     photo_path=media_path, headline=planner["headline"], out_path=out,
                     logo_path=(ROOT / overlay_cfg["logo"]) if overlay_cfg.get("logo") else None,
                     logo_text=overlay_cfg.get("logo_text"),
-                    brand_color=overlay_cfg.get("brand_color", "#ff5c1f"),
+                    brand_color=overlay_cfg.get("brand_color", "#ff4500"),
                 )
             post_paths = [out] + list(post_paths[1:])
             post["headline"] = planner["headline"]

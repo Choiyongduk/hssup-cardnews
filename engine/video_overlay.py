@@ -55,7 +55,7 @@ def _render_overlay_graphic(
     height: int,
     logo_path: Path | None = None,
     logo_text: str | None = None,
-    brand_color: str = "#ff5c1f",
+    brand_color: str = "#ff4500",
 ) -> Path:
     """로고+헤드라인만 있는 투명 배경 PNG를 렌더링합니다 (영상 위에 합성할 오버레이 레이어)."""
     env = Environment(
@@ -100,7 +100,7 @@ def render_video_overlay(
     out_path: Path,
     logo_path: Path | None = None,
     logo_text: str | None = None,
-    brand_color: str = "#ff5c1f",
+    brand_color: str = "#ff4500",
     subtitles: list[dict] | None = None,
 ) -> Path:
     """영상을 릴스 규격(9:16, 1080x1920)으로 맞추고 그 위에 로고+헤드라인을 입혀 out_path에 씁니다.

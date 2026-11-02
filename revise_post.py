@@ -230,7 +230,7 @@ def _rerender_photo(row: dict, headline: str, subtitles: list[dict] | None = Non
                 video_path=src, headline=headline, out_path=out,
                 logo_path=(ROOT / logo) if logo else None,
                 logo_text=overlay_cfg.get("logo_text"),
-                brand_color=overlay_cfg.get("brand_color", "#ff5c1f"),
+                brand_color=overlay_cfg.get("brand_color", "#ff4500"),
                 subtitles=subtitles,
             )
         else:
@@ -241,7 +241,7 @@ def _rerender_photo(row: dict, headline: str, subtitles: list[dict] | None = Non
                 photo_path=src, headline=headline, out_path=out,
                 logo_path=(ROOT / logo) if logo else None,
                 logo_text=overlay_cfg.get("logo_text"),
-                brand_color=overlay_cfg.get("brand_color", "#ff5c1f"),
+                brand_color=overlay_cfg.get("brand_color", "#ff4500"),
             )
 
         new_cover = assets.upload_images([out], row["channel"], f"revised/{row['ref_key']}")
