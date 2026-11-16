@@ -15,6 +15,16 @@ API_VERSION = "v21.0"
 API = f"https://graph.facebook.com/{API_VERSION}"
 
 
+# 눈에 안 보이는 글자(폭 없는 공백, 방향 표시 등)는 AI 도구가 남기기 쉽고, 인스타 캡션에서 줄바꿈과 해시태그를 깨기도 한다.
+# 올리기 직전에 지우고, 줄바꿈 없는 공백(U+00A0, U+202F)은 보통 공백으로 바꾼다.
+_INVISIBLE = dict.fromkeys(map(ord, "​‌‍‎‏⁠⁡⁢⁣⁤﻿­‪‫‬‭‮"), None)
+_INVISIBLE.update({0x00A0: " ", 0x202F: " ", 0x2007: " "})
+
+
+def clean_caption(text: str) -> str:
+    return (text or "").translate(_INVISIBLE)
+
+
 def _post(path: str, **params) -> dict:
     resp = requests.post(f"{API}/{path}", data=params, timeout=30)
     body = resp.json()
@@ -48,7 +58,7 @@ def publish_carousel(business_id: str, token: str, image_urls: list[str], captio
     1장이면 단일 이미지 게시, 2장 이상이면 캐러셀로 게시합니다
     (Instagram API는 캐러셀에 최소 2개의 하위 미디어를 요구합니다)."""
     if len(image_urls) == 1:
-        container = _post(f"{business_id}/media", image_url=image_urls[0], caption=caption, access_token=token)
+        container = _post(f"{business_id}/media", image_url=image_urls[0], caption=clean_caption(caption), access_token=token)
         _wait_until_ready(container["id"], token)
         published = _post(f"{business_id}/media_publish", creation_id=container["id"], access_token=token)
         return published["id"]
@@ -65,7 +75,7 @@ def publish_carousel(business_id: str, token: str, image_urls: list[str], captio
         f"{business_id}/media",
         media_type="CAROUSEL",
         children=",".join(child_ids),
-        caption=caption,
+        caption=clean_caption(caption),
         access_token=token,
     )
     _wait_until_ready(carousel["id"], token)
@@ -83,7 +93,7 @@ def publish_video(business_id: str, token: str, video_url: str, caption: str, th
         f"{business_id}/media",
         media_type="REELS",
         video_url=video_url,
-        caption=caption,
+        caption=clean_caption(caption),
         access_token=token,
         **extra,
     )

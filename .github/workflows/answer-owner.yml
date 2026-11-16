@@ -19,6 +19,9 @@ jobs:
       - name: Install dependencies
         run: pip install anthropic requests python-dotenv pyyaml
 
+      - name: Install ffmpeg (참고 영상에서 장면 사진 뽑기)
+        run: ffmpeg -version >/dev/null 2>&1 || (sudo apt-get update && sudo apt-get install -y ffmpeg)
+
       - name: Answer pending feedback
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
